@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans&display=swap" rel="stylesheet">
+  <title>Poker Tournament</title>
+  <style>
+    body {
+      font-family: 'Noto Sans', sans-serif;
+    }
+    .slide-in {
+      transition: transform 0.3s ease;
+    }
+    .hidden-sidebar {
+      transform: translateX(-100%);
+    }
+    .visible-sidebar {
+      transform: translateX(0);
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white h-full">
+  <audio id="alert1min" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+  <audio id="alertEnd" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="slide-in hidden-sidebar fixed top-0 left-0 h-full w-80 bg-gray-800 p-4 z-40 overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Settings</h2>
+        <button onclick="toggleSidebar()" class="text-[1rem]"><<</button>
+      </div>
+      <!-- Blind Settings -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-2">Blinds</h3>
+        <div id="blindsList"></div>
+        <button onclick="addBlind()" class="mt-2 bg-green-600 px-4 py-1 rounded">+ Add Blind</button>
+      </div>
+      <!-- Controls -->
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-2">Timer Controls</h3>
+        <button onclick="startTimer()" class="bg-blue-600 px-4 py-1 rounded mr-2">▶ Start</button>
+        <button onclick="resetTimer()" class="bg-red-600 px-4 py-1 rounded">⟲ Reset</button>
+      </div>
+      <!-- Prize Settings -->
+      <div>
+        <h3 class="text-lg font-semibold mb-2">Prize Pool</h3>
+        <label>Buy-in: <input id="buyin" type="number" class="bg-gray-700 w-20 px-1" value="300" onchange="updatePrizes()"></label><br/>
+        <label>Rake (%): <input id="rake" type="number" class="bg-gray-700 w-20 px-1" value="15" onchange="updatePrizes()"></label><br/>
+        <label>1st (%): <input id="p1" type="number" class="bg-gray-700 w-20 px-1" value="50" onchange="updatePrizes()"></label><br/>
+        <label>2nd (%): <input id="p2" type="number" class="bg-gray-700 w-20 px-1" value="20" onchange="updatePrizes()"></label><br/>
+        <label>3rd (%): <input id="p3" type="number" class="bg-gray-700 w-20 px-1" value="15" onchange="updatePrizes()"></label><br/>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col items-center justify-center text-center px-4">
+      <button onclick="toggleSidebar()" class="absolute top-4 left-4 bg-blue-500 px-3 py-1 rounded">☰ Settings</button>
+
+      <h1 id="timer" class="text-[22rem] font-bold mb-6">00:00</h1>
+
+      <div class="text-2xl mb-2">Current Blind</div>
+      <div id="currentBlind" class="text-[6rem] font-semibold mb-4">SB 100 / BB 200</div>
+
+      <div class="text-[2rem] text-gray-400 mb-6">Next: SB 200 / BB 400</div>
+
+      <div class="flex items-center justify-center mb-6">
+        <button onclick="changePlayers(-1)" class="bg-red-600 px-3 py-1 rounded text-lg">-</button>
+        <div class="px-4 text-2xl">Players: <span id="playerCount">9</span></div>
+        <button onclick="changePlayers(1)" class="bg-green-600 px-3 py-1 rounded text-lg">+</button>
+      </div>
+
+      <div class="flex items-center justify-center mb-4">
+        <button id="pauseBtn" onclick="togglePause()" class="bg-yellow-500 px-6 py-2 rounded text-lg">⏸ Pause</button>
+      </div>
+
+      <div class="w-full max-w-md bg-gray-800 p-4 rounded shadow">
+        <h2 class="text-[2rem] font-bold mb-2">🏆Prize Pool</h2>
+        <div id="prizes" class="text-[3rem] space-y-1">
+          <div>🥇1st : ฿</div>
+          <div>🥈2nd : ฿</div>
+          <div>🥉3rd : ฿</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let blinds = JSON.parse(localStorage.getItem('blinds')) || [{ sb: 100, bb: 200, duration: 5 }];
+    let currentBlindIndex = 0;
+    let timer = blinds[0].duration * 60;
+    let players = parseInt(localStorage.getItem('players')) || 9;
+    let interval = null;
+    let paused = false;
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('visible-sidebar');
+      document.getElementById('sidebar').classList.toggle('hidden-sidebar');
+    }
+
+    function addBlind() {
+      blinds.push({ sb: 0, bb: 0, duration: 5 });
+      saveData();
+      renderBlinds();
+    }
+
+    function deleteBlind(index) {
+      blinds.splice(index, 1);
+      saveData();
+      renderBlinds();
+    }
+
+    function renderBlinds() {
+      const list = document.getElementById('blindsList');
+      list.innerHTML = '';
+      blinds.forEach((b, i) => {
+        list.innerHTML += `
+          <div class="mb-2 flex items-center space-x-1">
+            SB <input type="number" value="${b.sb}" onchange="updateBlind(${i}, 'sb', this.value)" class="bg-gray-700 w-16 px-1"> 
+            BB <input type="number" value="${b.bb}" onchange="updateBlind(${i}, 'bb', this.value)" class="bg-gray-700 w-16 px-1">
+            Min <input type="number" value="${b.duration}" onchange="updateBlind(${i}, 'duration', this.value)" class="bg-gray-700 w-16 px-1">
+            <button onclick="deleteBlind(${i})" class="text-red-500 px-2">✖</button>
+          </div>`;
+      });
+    }
+
+    function updateBlind(i, key, value) {
+      blinds[i][key] = parseInt(value);
+      saveData();
+    }
+
+    function updateDisplay() {
+      const blind = blinds[currentBlindIndex];
+      const isBreak = blind.sb === 0 && blind.bb === 0;
+      document.getElementById('currentBlind').textContent = isBreak ? 'Break Time' : ` ${blind.sb} /  ${blind.bb}`;
+      const next = blinds[currentBlindIndex + 1];
+      document.querySelector('.text-gray-400').textContent = next ? `Next: ${next.sb} / ${next.bb}` : 'Last Blind';
+    }
+
+    function updatePrizes() {
+      const buyin = parseFloat(document.getElementById('buyin').value);
+      const rake = parseFloat(document.getElementById('rake').value);
+      const p1 = parseFloat(document.getElementById('p1').value);
+      const p2 = parseFloat(document.getElementById('p2').value);
+      const p3 = parseFloat(document.getElementById('p3').value);
+      const total = players * buyin * (1 - rake / 100);
+      document.getElementById('prizes').innerHTML = `
+        <div>1st: ฿${Math.floor((total * p1 / 100) / 10) * 10}</div>
+        <div>2nd: ฿${Math.floor((total * p2 / 100) / 10) * 10}</div>
+        <div>3rd: ฿${Math.floor((total * p3 / 100) / 10) * 10}</div>`;
+    }
+
+    function changePlayers(n) {
+      players = Math.max(1, players + n);
+      document.getElementById('playerCount').textContent = players;
+      saveData();
+      updatePrizes();
+    }
+
+    function startTimer() {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (paused) return;
+
+        if (timer === 60) document.getElementById('alert1min').play();
+        if (timer === 0) document.getElementById('alertEnd').play();
+
+        if (timer > 0) {
+          timer--;
+        } else if (currentBlindIndex < blinds.length - 1) {
+          currentBlindIndex++;
+          timer = blinds[currentBlindIndex].duration * 60;
+          updateDisplay();
+        }
+        const m = String(Math.floor(timer / 60)).padStart(2, '0');
+        const s = String(timer % 60).padStart(2, '0');
+        document.getElementById('timer').textContent = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function resetTimer() {
+      clearInterval(interval);
+      interval = null;
+      paused = false;
+      document.getElementById('pauseBtn').textContent = '⏸ Pause';
+      currentBlindIndex = 0;
+      timer = blinds[0].duration * 60;
+      updateDisplay();
+      const m = String(Math.floor(timer / 60)).padStart(2, '0');
+      const s = String(timer % 60).padStart(2, '0');
+      document.getElementById('timer').textContent = `${m}:${s}`;
+    }
+
+    function togglePause() {
+      paused = !paused;
+      document.getElementById('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
+    }
+
+    function saveData() {
+      localStorage.setItem('blinds', JSON.stringify(blinds));
+      localStorage.setItem('players', players);
+    }
+
+    renderBlinds();
+    updateDisplay();
+    updatePrizes();
+    resetTimer();
+  </script>
+</body>
+</html>
