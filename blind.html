@@ -87,30 +87,41 @@
   </div>
 
   <script>
+    // Initialize variables, loading from localStorage or setting defaults
     let blinds = JSON.parse(localStorage.getItem('blinds')) || [{ sb: 100, bb: 200, duration: 5 }];
     let currentBlindIndex = 0;
     let timer = blinds[0].duration * 60;
     let players = parseInt(localStorage.getItem('players')) || 9;
+    let rake = parseFloat(localStorage.getItem('rake')) || 15; // Load rake
+    let buyin = parseFloat(localStorage.getItem('buyin')) || 300; // Load buyin
+    let p1 = parseFloat(localStorage.getItem('p1')) || 50; // Load 1st prize %
+    let p2 = parseFloat(localStorage.getItem('p2')) || 20; // Load 2nd prize %
+    let p3 = parseFloat(localStorage.getItem('p3')) || 15; // Load 3rd prize %
+
     let interval = null;
     let paused = false;
 
+    // Function to toggle sidebar visibility
     function toggleSidebar() {
       document.getElementById('sidebar').classList.toggle('visible-sidebar');
       document.getElementById('sidebar').classList.toggle('hidden-sidebar');
     }
 
+    // Function to add a new blind level
     function addBlind() {
       blinds.push({ sb: 0, bb: 0, duration: 5 });
-      saveData();
-      renderBlinds();
+      saveData(); // Save data after adding
+      renderBlinds(); // Re-render the blinds list
     }
 
+    // Function to delete a blind level
     function deleteBlind(index) {
       blinds.splice(index, 1);
-      saveData();
-      renderBlinds();
+      saveData(); // Save data after deleting
+      renderBlinds(); // Re-render the blinds list
     }
 
+    // Function to render the list of blind levels in the sidebar
     function renderBlinds() {
       const list = document.getElementById('blindsList');
       list.innerHTML = '';
@@ -125,11 +136,13 @@
       });
     }
 
+    // Function to update a specific blind level's value
     function updateBlind(i, key, value) {
       blinds[i][key] = parseInt(value);
-      saveData();
+      saveData(); // Save data after updating
     }
 
+    // Function to update the main display (current and next blind)
     function updateDisplay() {
       const blind = blinds[currentBlindIndex];
       const isBreak = blind.sb === 0 && blind.bb === 0;
@@ -138,73 +151,100 @@
       document.querySelector('.text-gray-400').textContent = next ? `Next: ${next.sb} / ${next.bb}` : 'Last Blind';
     }
 
+    // Function to update prize calculations and display
     function updatePrizes() {
-      const buyin = parseFloat(document.getElementById('buyin').value);
-      const rake = parseFloat(document.getElementById('rake').value);
-      const p1 = parseFloat(document.getElementById('p1').value);
-      const p2 = parseFloat(document.getElementById('p2').value);
-      const p3 = parseFloat(document.getElementById('p3').value);
+      // Get values from input fields and update global variables
+      buyin = parseFloat(document.getElementById('buyin').value);
+      rake = parseFloat(document.getElementById('rake').value);
+      p1 = parseFloat(document.getElementById('p1').value);
+      p2 = parseFloat(document.getElementById('p2').value);
+      p3 = parseFloat(document.getElementById('p3').value);
+
+      // Save the updated prize settings
+      saveData();
+
       const total = players * buyin * (1 - rake / 100);
       document.getElementById('prizes').innerHTML = `
-        <div>1st: ฿${Math.floor((total * p1 / 100) / 10) * 10}</div>
-        <div>2nd: ฿${Math.floor((total * p2 / 100) / 10) * 10}</div>
-        <div>3rd: ฿${Math.floor((total * p3 / 100) / 10) * 10}</div>`;
+        <div>🥇1st: ฿${Math.floor((total * p1 / 100) / 10) * 10}</div>
+        <div>🥈2nd: ฿${Math.floor((total * p2 / 100) / 10) * 10}</div>
+        <div>🥉3rd: ฿${Math.floor((total * p3 / 100) / 10) * 10}</div>`;
     }
 
+    // Function to change the number of players
     function changePlayers(n) {
       players = Math.max(1, players + n);
       document.getElementById('playerCount').textContent = players;
-      saveData();
-      updatePrizes();
+      saveData(); // Save data after changing players
+      updatePrizes(); // Recalculate prizes
     }
 
+    // Function to start the timer
     function startTimer() {
-      if (interval) return;
+      if (interval) return; // Prevent multiple intervals
       interval = setInterval(() => {
-        if (paused) return;
+        if (paused) return; // Do nothing if paused
 
+        // Play alert sounds
         if (timer === 60) document.getElementById('alert1min').play();
         if (timer === 0) document.getElementById('alertEnd').play();
 
         if (timer > 0) {
-          timer--;
+          timer--; // Decrement timer
         } else if (currentBlindIndex < blinds.length - 1) {
-          currentBlindIndex++;
-          timer = blinds[currentBlindIndex].duration * 60;
-          updateDisplay();
+          currentBlindIndex++; // Move to next blind
+          timer = blinds[currentBlindIndex].duration * 60; // Reset timer for new blind
+          updateDisplay(); // Update display for new blind
         }
+        // Format and display timer
         const m = String(Math.floor(timer / 60)).padStart(2, '0');
         const s = String(timer % 60).padStart(2, '0');
         document.getElementById('timer').textContent = `${m}:${s}`;
-      }, 1000);
+      }, 1000); // Update every second
     }
 
+    // Function to reset the timer
     function resetTimer() {
-      clearInterval(interval);
+      clearInterval(interval); // Clear any existing interval
       interval = null;
       paused = false;
-      document.getElementById('pauseBtn').textContent = '⏸ Pause';
-      currentBlindIndex = 0;
-      timer = blinds[0].duration * 60;
-      updateDisplay();
+      document.getElementById('pauseBtn').textContent = '⏸ Pause'; // Reset pause button text
+      currentBlindIndex = 0; // Reset to first blind
+      timer = blinds[0].duration * 60; // Reset timer duration
+      updateDisplay(); // Update display
+      // Display initial timer value
       const m = String(Math.floor(timer / 60)).padStart(2, '0');
       const s = String(timer % 60).padStart(2, '0');
       document.getElementById('timer').textContent = `${m}:${s}`;
     }
 
+    // Function to toggle pause/resume
     function togglePause() {
       paused = !paused;
       document.getElementById('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
     }
 
+    // Function to save all relevant data to localStorage
     function saveData() {
       localStorage.setItem('blinds', JSON.stringify(blinds));
       localStorage.setItem('players', players);
+      localStorage.setItem('rake', rake); // Save rake
+      localStorage.setItem('buyin', buyin); // Save buyin
+      localStorage.setItem('p1', p1);     // Save 1st prize %
+      localStorage.setItem('p2', p2);     // Save 2nd prize %
+      localStorage.setItem('p3', p3);     // Save 3rd prize %
     }
+
+    // Initial setup calls
+    // Set initial values for prize inputs from localStorage or defaults
+    document.getElementById('buyin').value = buyin;
+    document.getElementById('rake').value = rake;
+    document.getElementById('p1').value = p1;
+    document.getElementById('p2').value = p2;
+    document.getElementById('p3').value = p3;
 
     renderBlinds();
     updateDisplay();
-    updatePrizes();
+    updatePrizes(); // Call updatePrizes to initialize prize display and save initial values
     resetTimer();
   </script>
 </body>

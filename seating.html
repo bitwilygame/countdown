@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>สุ่มที่นั่ง</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: #f5f7fa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      color: #333;
+    }
+
+    h1 {
+      font-family: 'Prompt', sans-serif;
+      color: #222;
+      margin-bottom: 1rem;
+    }
+
+    .input-area {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 600px;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      padding: 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.8rem 1.5rem;
+      font-family: 'Prompt', sans-serif;
+      font-size: 1rem;
+      background: #0077ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 1rem 0;
+    }
+
+    button:hover {
+      background: #005fd4;
+    }
+
+    .result {
+      background: white;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .result p {
+      font-size: 3rem;
+      margin: 0.5rem 0;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <h1>สุ่มที่นั่ง</h1>
+  <div class="input-area" id="nameInputs">
+    <!-- ช่องกรอกชื่อ 9 ช่อง -->
+    <input type="text" placeholder="ชื่อ 1">
+    <input type="text" placeholder="ชื่อ 2">
+    <input type="text" placeholder="ชื่อ 3">
+    <input type="text" placeholder="ชื่อ 4">
+    <input type="text" placeholder="ชื่อ 5">
+    <input type="text" placeholder="ชื่อ 6">
+    <input type="text" placeholder="ชื่อ 7">
+    <input type="text" placeholder="ชื่อ 8">
+    <input type="text" placeholder="ชื่อ 9">
+  </div>
+  <button onclick="generate()">สุ่มเลย!</button>
+  <div class="result" id="resultArea"></div>
+
+  <script>
+    function generate() {
+      const inputs = document.querySelectorAll('#nameInputs input');
+      const names = Array.from(inputs)
+        .map(input => input.value.trim())
+        .filter(name => name !== "");
+
+      if (names.length === 0) {
+        alert("กรุณาใส่ชื่ออย่างน้อย 1 คน");
+        return;
+      }
+
+      const numbers = Array.from({ length: 9 }, (_, i) => i + 1);
+      shuffleArray(numbers);
+
+      const result = names.map((name, index) => ({
+        name,
+        number: numbers[index]
+      }));
+
+      displayResult(result);
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    function displayResult(resultList) {
+      const resultArea = document.getElementById('resultArea');
+      resultArea.innerHTML = "";
+      
+      resultList.sort((a, b) => a.number - b.number);
+      
+      resultList.forEach(entry => {
+        const p = document.createElement("p");
+        p.textContent = `${entry.number}  --> ${entry.name}`;
+        resultArea.appendChild(p);
+      });
+    }
+  </script>
+</body>
+</html>
