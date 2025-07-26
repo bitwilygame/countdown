@@ -47,7 +47,7 @@
       <div>
         <h3 class="text-lg font-semibold mb-2">Prize Pool</h3>
         <label>Buy-in: <input id="buyin" type="number" class="bg-gray-700 w-20 px-1" value="300" onchange="updatePrizes()"></label><br/>
-        <label>Rake (%): <input id="rake" type="number" class="bg-gray-700 w-20 px-1" value="15" onchange="updatePrizes()"></label><br/>
+        <!-- Rake input removed as it's now calculated -->
         <label>1st (%): <input id="p1" type="number" class="bg-gray-700 w-20 px-1" value="50" onchange="updatePrizes()"></label><br/>
         <label>2nd (%): <input id="p2" type="number" class="bg-gray-700 w-20 px-1" value="20" onchange="updatePrizes()"></label><br/>
         <label>3rd (%): <input id="p3" type="number" class="bg-gray-700 w-20 px-1" value="15" onchange="updatePrizes()"></label><br/>
@@ -92,11 +92,12 @@
     let currentBlindIndex = 0;
     let timer = blinds[0].duration * 60;
     let players = parseInt(localStorage.getItem('players')) || 9;
-    let rake = parseFloat(localStorage.getItem('rake')) || 15; // Load rake
+    // Rake is now calculated, no longer loaded from localStorage directly
     let buyin = parseFloat(localStorage.getItem('buyin')) || 300; // Load buyin
     let p1 = parseFloat(localStorage.getItem('p1')) || 50; // Load 1st prize %
     let p2 = parseFloat(localStorage.getItem('p2')) || 20; // Load 2nd prize %
     let p3 = parseFloat(localStorage.getItem('p3')) || 15; // Load 3rd prize %
+    let rake; // Declare rake, its value will be calculated
 
     let interval = null;
     let paused = false;
@@ -155,19 +156,27 @@
     function updatePrizes() {
       // Get values from input fields and update global variables
       buyin = parseFloat(document.getElementById('buyin').value);
-      rake = parseFloat(document.getElementById('rake').value);
       p1 = parseFloat(document.getElementById('p1').value);
       p2 = parseFloat(document.getElementById('p2').value);
       p3 = parseFloat(document.getElementById('p3').value);
 
-      // Save the updated prize settings
+      // Calculate rake based on the sum of prize percentages
+      rake = 100 - (p1 + p2 + p3);
+      
+      // Save the updated prize settings (excluding rake, as it's calculated)
       saveData();
 
       const total = players * buyin * (1 - rake / 100);
+      
+      // Calculate and round down to the nearest 10 for each prize
+      const prize1st = Math.floor((total * p1 / 100) / 10) * 10;
+      const prize2nd = Math.floor((total * p2 / 100) / 10) * 10;
+      const prize3rd = Math.floor((total * p3 / 100) / 10) * 10;
+
       document.getElementById('prizes').innerHTML = `
-        <div>🥇1st: ฿${Math.floor((total * p1 / 100) / 10) * 10}</div>
-        <div>🥈2nd: ฿${Math.floor((total * p2 / 100) / 10) * 10}</div>
-        <div>🥉3rd: ฿${Math.floor((total * p3 / 100) / 10) * 10}</div>`;
+        <div>🥇1st: ฿${prize1st}</div>
+        <div>🥈2nd: ฿${prize2nd}</div>
+        <div>🥉3rd: ฿${prize3rd}</div>`;
     }
 
     // Function to change the number of players
@@ -227,7 +236,7 @@
     function saveData() {
       localStorage.setItem('blinds', JSON.stringify(blinds));
       localStorage.setItem('players', players);
-      localStorage.setItem('rake', rake); // Save rake
+      // localStorage.setItem('rake', rake); // Rake is now calculated, no longer saved directly
       localStorage.setItem('buyin', buyin); // Save buyin
       localStorage.setItem('p1', p1);     // Save 1st prize %
       localStorage.setItem('p2', p2);     // Save 2nd prize %
@@ -237,14 +246,14 @@
     // Initial setup calls
     // Set initial values for prize inputs from localStorage or defaults
     document.getElementById('buyin').value = buyin;
-    document.getElementById('rake').value = rake;
+    // document.getElementById('rake').value = rake; // Rake input removed
     document.getElementById('p1').value = p1;
     document.getElementById('p2').value = p2;
     document.getElementById('p3').value = p3;
 
     renderBlinds();
     updateDisplay();
-    updatePrizes(); // Call updatePrizes to initialize prize display and save initial values
+    updatePrizes(); // Call updatePrizes to initialize prize display and calculate initial rake
     resetTimer();
   </script>
 </body>
