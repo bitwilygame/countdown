@@ -88,7 +88,7 @@
 
   <script>
     // Initialize variables, loading from localStorage or setting defaults
-    let blinds = JSON.parse(localStorage.getItem('blinds')) || [{ sb: 100, bb: 200, duration: 5 }];
+    let blinds = JSON.parse(localStorage.getItem('blinds')) || [{ sb: 100, bb: 200, duration: 20 }];
     let currentBlindIndex = 0;
     let timer = blinds[0].duration * 60;
     let players = parseInt(localStorage.getItem('players')) || 9;
@@ -109,7 +109,7 @@
 
     // Function to add a new blind level
     function addBlind() {
-      blinds.push({ sb: 0, bb: 0, duration: 5 });
+      blinds.push({ sb: 0, bb: 0, duration: 20 });
       saveData(); // Save data after adding
       renderBlinds(); // Re-render the blinds list
     }
