@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>รับ–จ่าย + สรุป CSV</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6">
+    <header class="flex items-center justify-between gap-3">
+      <h1 class="text-2xl font-bold">บันทึก รับ–จ่าย</h1>
+      <div class="flex gap-2">
+        <button id="resetBtn" class="px-3 py-2 rounded border border-red-300 text-red-700 hover:bg-red-50">รีเซ็ตข้อมูล</button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="mt-4 flex gap-2">
+      <button data-tab="receive" class="tab px-4 py-2 rounded bg-white border shadow text-sm font-medium">หน้ารับเงิน</button>
+      <button data-tab="pay" class="tab px-4 py-2 rounded bg-white border shadow text-sm font-medium">หน้าจ่ายเงิน</button>
+      <button data-tab="save" class="tab px-4 py-2 rounded bg-white border shadow text-sm font-medium">หน้า Save / สรุป</button>
+    </nav>
+
+    <main class="mt-6">
+      <!-- หน้ารับเงิน -->
+      <section id="tab-receive" class="tab-panel">
+        <div class="grid sm:grid-cols-3 gap-3 bg-white p-4 border rounded shadow">
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">ชื่อผู้รับเงิน</label>
+            <input id="recvName" type="text" class="w-full px-3 py-2 border rounded" placeholder="เช่น เอ, บี" />
+          </div>
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">จำนวนเงิน</label>
+            <input id="recvAmount" type="number" step="0.01" class="w-full px-3 py-2 border rounded" placeholder="0.00" />
+          </div>
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">วิธีรับ</label>
+            <div class="flex items-center gap-4">
+              <label class="inline-flex items-center gap-2">
+                <input id="recvTransfer" type="checkbox" class="method-recv">
+                <span>โอน</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="recvCash" type="checkbox" class="method-recv">
+                <span>เงินสด</span>
+              </label>
+            </div>
+          </div>
+          <div class="sm:col-span-3 flex justify-end">
+            <button id="addReceive" class="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">เพิ่มรายการรับ</button>
+          </div>
+        </div>
+
+        <h2 class="mt-6 font-semibold">รายการรับล่าสุด</h2>
+        <div class="mt-2 overflow-x-auto">
+          <table class="min-w-full bg-white border rounded shadow text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="text-left p-2 border">เวลา</th>
+                <th class="text-left p-2 border">ชื่อ</th>
+                <th class="text-right p-2 border">จำนวน</th>
+                <th class="text-left p-2 border">วิธี</th>
+                <th class="text-center p-2 border w-20">ลบ</th>
+              </tr>
+            </thead>
+            <tbody id="receiveTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- หน้าจ่ายเงิน -->
+      <section id="tab-pay" class="tab-panel hidden">
+        <div class="grid sm:grid-cols-3 gap-3 bg-white p-4 border rounded shadow">
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">ชื่อผู้จ่าย</label>
+            <select id="payName" class="w-full px-3 py-2 border rounded">
+              <option value="" disabled selected>— เลือกชื่อจากหน้ารับเงิน —</option>
+            </select>
+          </div>
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">จำนวนเงิน</label>
+            <input id="payAmount" type="number" step="0.01" class="w-full px-3 py-2 border rounded" placeholder="0.00" />
+          </div>
+          <div class="sm:col-span-1">
+            <label class="block text-sm mb-1">วิธีจ่าย</label>
+            <div class="flex items-center gap-4">
+              <label class="inline-flex items-center gap-2">
+                <input id="payTransfer" type="checkbox" class="method-pay">
+                <span>โอน</span>
+              </label>
+              <label class="inline-flex items-center gap-2">
+                <input id="payCash" type="checkbox" class="method-pay">
+                <span>เงินสด</span>
+              </label>
+            </div>
+          </div>
+          <div class="sm:col-span-3 flex justify-end">
+            <button id="addPay" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">เพิ่มรายการจ่าย</button>
+          </div>
+        </div>
+
+        <h2 class="mt-6 font-semibold">รายการจ่ายล่าสุด</h2>
+        <div class="mt-2 overflow-x-auto">
+          <table class="min-w-full bg-white border rounded shadow text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="text-left p-2 border">เวลา</th>
+                <th class="text-left p-2 border">ชื่อ</th>
+                <th class="text-right p-2 border">จำนวน</th>
+                <th class="text-left p-2 border">วิธี</th>
+                <th class="text-center p-2 border w-20">ลบ</th>
+              </tr>
+            </thead>
+            <tbody id="payTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- หน้า save / สรุป -->
+      <section id="tab-save" class="tab-panel hidden">
+        <div class="bg-white p-4 border rounded shadow">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-semibold">สรุปสุทธิ</h2>
+            <div class="flex gap-2">
+              <button id="exportCsv" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">บันทึกเป็น CSV</button>
+            </div>
+          </div>
+          <div class="mt-3 overflow-x-auto">
+            <table class="min-w-full bg-white border rounded text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="text-left p-2 border">ชื่อ</th>
+                  <th class="text-right p-2 border">รับ(โอน)</th>
+                  <th class="text-right p-2 border">รับ(สด)</th>
+                  <th class="text-right p-2 border">รับรวม</th>
+                  <th class="text-right p-2 border">จ่าย(โอน)</th>
+                  <th class="text-right p-2 border">จ่าย(สด)</th>
+                  <th class="text-right p-2 border">จ่ายรวม</th>
+                  <th class="text-center p-2 border">สุทธิ (บวก/ลบ)</th>
+                </tr>
+              </thead>
+              <tbody id="summaryTbody"></tbody>
+              <tfoot>
+                <tr class="bg-slate-50 font-semibold">
+                  <td class="p-2 border text-right">รวมทั้งหมด</td>
+                  <td id="tRecvTransfer" class="p-2 border text-right"></td>
+                  <td id="tRecvCash" class="p-2 border text-right"></td>
+                  <td id="tRecvTotal" class="p-2 border text-right"></td>
+                  <td id="tPayTransfer" class="p-2 border text-right"></td>
+                  <td id="tPayCash" class="p-2 border text-right"></td>
+                  <td id="tPayTotal" class="p-2 border text-right"></td>
+                  <td id="tNetText" class="p-2 border text-center"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- บรรทัดสรุป dealer / cashier -->
+          <div class="mt-4 text-sm">
+            <p id="dealerLine" class="mt-1"></p>
+            <p id="cashierLine" class="mt-1"></p>
+          </div>
+
+          <p class="mt-3 text-xs text-slate-500">หมายเหตุ: “สุทธิ” แสดงว่าแต่ละคน “บวก” หรือ “ลบ”; ไฟล์ CSV จะมีตัวเลขสุทธิแนบไว้ด้วย</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ---- State & Storage ----
+    const KEY = 'receive_pay_app_v1';
+    const state = loadState();
+
+    function loadState() {
+      const raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : { receive: [], pay: [] };
+    }
+    function saveState() {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    // ---- Utility ----
+    function onlyOneInGroup(selector, clickedEl) {
+      document.querySelectorAll(selector).forEach(el => {
+        if (el !== clickedEl) el.checked = false;
+      });
+    }
+    function methodFromCheckboxes(c1, c2) {
+      if (c1.checked && !c2.checked) return 'โอน';
+      if (c2.checked && !c1.checked) return 'เงินสด';
+      return null;
+    }
+    function fmt(n) {
+      return Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function nowStr() {
+      const d = new Date();
+      return d.toLocaleString('th-TH');
+    }
+    function sum(arr){ return arr.reduce((a,b)=>a+Number(b||0),0); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+    function csvEscape(s){
+      const str = String(s ?? '');
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g,'""')}"` : str;
+    }
+
+    // ---- Tabs ----
+    const tabs = document.querySelectorAll('.tab');
+    const panels = {
+      receive: document.getElementById('tab-receive'),
+      pay: document.getElementById('tab-pay'),
+      save: document.getElementById('tab-save'),
+    };
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.tab;
+        Object.values(panels).forEach(p => p.classList.add('hidden'));
+        panels[t].classList.remove('hidden');
+        tabs.forEach(b => b.classList.remove('bg-indigo-600','text-white'));
+        btn.classList.add('bg-indigo-600','text-white');
+        if (t === 'save') renderSummary();
+        if (t === 'pay') refreshNameSelect();
+      });
+    });
+    // default tab
+    document.querySelector('[data-tab="receive"]').click();
+
+    // ---- Checkboxes (enforce single choice) ----
+    document.querySelectorAll('.method-recv').forEach(el => {
+      el.addEventListener('change', e => onlyOneInGroup('.method-recv', e.target));
+    });
+    document.querySelectorAll('.method-pay').forEach(el => {
+      el.addEventListener('change', e => onlyOneInGroup('.method-pay', e.target));
+    });
+
+    // ---- Receive handlers ----
+    const recvName = document.getElementById('recvName');
+    const recvAmount = document.getElementById('recvAmount');
+    const recvTransfer = document.getElementById('recvTransfer');
+    const recvCash = document.getElementById('recvCash');
+    const receiveTbody = document.getElementById('receiveTbody');
+
+    document.getElementById('addReceive').addEventListener('click', () => {
+      const name = recvName.value.trim();
+      const amount = parseFloat(recvAmount.value);
+      const method = methodFromCheckboxes(recvTransfer, recvCash);
+
+      if (!name) return alert('กรุณากรอกชื่อผู้รับเงิน');
+      if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้อง (> 0)');
+      if (!method) return alert('กรุณาเลือกวิธีรับ (โอน หรือ เงินสด เท่านั้น)');
+
+      state.receive.push({ id: cryptoRandomId(), ts: Date.now(), time: nowStr(), name, amount, method });
+      saveState();
+      renderReceive();
+      refreshNameSelect();
+      recvAmount.value = '';
+    });
+
+    // ลบรายการรับ (event delegation)
+    receiveTbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-del-id]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-del-id');
+      const idx = state.receive.findIndex(r => r.id === id);
+      if (idx >= 0 && confirm('ลบรายการรับนี้?')) {
+        state.receive.splice(idx, 1);
+        saveState();
+        renderReceive();
+        refreshNameSelect();
+      }
+    });
+
+    function renderReceive() {
+      receiveTbody.innerHTML = state.receive
+        .slice().reverse()
+        .map(r => `
+          <tr>
+            <td class="p-2 border">${r.time}</td>
+            <td class="p-2 border">${escapeHtml(r.name)}</td>
+            <td class="p-2 border text-right">${fmt(r.amount)}</td>
+            <td class="p-2 border">${r.method}</td>
+            <td class="p-2 border text-center">
+              <button data-del-id="${escapeAttr(r.id)}" class="px-2 py-1 rounded border hover:bg-red-50 text-red-700">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+    }
+
+    // ---- Pay handlers ----
+    const payName = document.getElementById('payName');
+    const payAmount = document.getElementById('payAmount');
+    const payTransfer = document.getElementById('payTransfer');
+    const payCash = document.getElementById('payCash');
+    const payTbody = document.getElementById('payTbody');
+
+    document.getElementById('addPay').addEventListener('click', () => {
+      const name = payName.value;
+      const amount = parseFloat(payAmount.value);
+      const method = methodFromCheckboxes(payTransfer, payCash);
+
+      if (!name) return alert('กรุณาเลือกชื่อผู้จ่าย');
+      if (!amount || amount <= 0) return alert('กรุณากรอกจำนวนเงินให้ถูกต้อง (> 0)');
+      if (!method) return alert('กรุณาเลือกวิธีจ่าย (โอน หรือ เงินสด เท่านั้น)');
+
+      state.pay.push({ id: cryptoRandomId(), ts: Date.now(), time: nowStr(), name, amount, method });
+      saveState();
+      renderPay();
+      payAmount.value = '';
+    });
+
+    // ลบรายการจ่าย
+    payTbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-del-id]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-del-id');
+      const idx = state.pay.findIndex(r => r.id === id);
+      if (idx >= 0 && confirm('ลบรายการจ่ายนี้?')) {
+        state.pay.splice(idx, 1);
+        saveState();
+        renderPay();
+      }
+    });
+
+    function refreshNameSelect() {
+      const names = Array.from(new Set(state.receive.map(r => r.name))).sort((a,b)=>a.localeCompare(b, 'th'));
+      const prev = payName.value;
+      payName.innerHTML = `<option value="" disabled ${prev ? '' : 'selected'}>— เลือกชื่อจากหน้ารับเงิน —</option>` +
+        names.map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+    }
+
+    function renderPay() {
+      payTbody.innerHTML = state.pay
+        .slice().reverse()
+        .map(r => `
+          <tr>
+            <td class="p-2 border">${r.time}</td>
+            <td class="p-2 border">${escapeHtml(r.name)}</td>
+            <td class="p-2 border text-right">${fmt(r.amount)}</td>
+            <td class="p-2 border">${r.method}</td>
+            <td class="p-2 border text-center">
+              <button data-del-id="${escapeAttr(r.id)}" class="px-2 py-1 rounded border hover:bg-red-50 text-red-700">ลบ</button>
+            </td>
+          </tr>
+        `).join('');
+    }
+
+    // ---- Summary & CSV ----
+    const summaryTbody = document.getElementById('summaryTbody');
+    const tRecvTransfer = document.getElementById('tRecvTransfer');
+    const tRecvCash = document.getElementById('tRecvCash');
+    const tRecvTotal = document.getElementById('tRecvTotal');
+    const tPayTransfer = document.getElementById('tPayTransfer');
+    const tPayCash = document.getElementById('tPayCash');
+    const tPayTotal = document.getElementById('tPayTotal');
+    const tNetText = document.getElementById('tNetText');
+
+    const dealerLine = document.getElementById('dealerLine');
+    const cashierLine = document.getElementById('cashierLine');
+
+    function buildSummary() {
+      const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
+      const rows = [];
+      let sRT=0, sRC=0, sPT=0, sPC=0;
+
+      names.forEach(name => {
+        const recvT = sum(state.receive.filter(r=>r.name===name && r.method==='โอน').map(r=>r.amount));
+        const recvC = sum(state.receive.filter(r=>r.name===name && r.method==='เงินสด').map(r=>r.amount));
+        const payT  = sum(state.pay.filter(r=>r.name===name && r.method==='โอน').map(r=>r.amount));
+        const payC  = sum(state.pay.filter(r=>r.name===name && r.method==='เงินสด').map(r=>r.amount));
+        const recvTotal = recvT + recvC;
+        const payTotal = payT + payC;
+        const net = recvTotal - payTotal;
+
+        rows.push({ name, recvT, recvC, recvTotal, payT, payC, payTotal, net });
+
+        sRT += recvT; sRC += recvC; sPT += payT; sPC += payC;
+      });
+
+      rows.sort((a,b)=>a.name.localeCompare(b.name,'th'));
+
+      const totals = {
+        recvT: sRT,
+        recvC: sRC,
+        recvTotal: sRT + sRC,
+        payT: sPT,
+        payC: sPC,
+        payTotal: sPT + sPC,
+        net: (sRT + sRC) - (sPT + sPC),
+      };
+
+      return { rows, totals };
+    }
+
+  function renderSummary() {
+    const { rows, totals } = buildSummary();
+    summaryTbody.innerHTML = rows.map(r => {
+      const signVal = r.payTotal - r.recvTotal; // กติกาใหม่: จ่าย-รับ
+      const label = signVal > 0 ? 'บวก' : (signVal < 0 ? 'ลบ' : 'เท่ากัน');
+      const prefix = signVal > 0 ? '+' : (signVal < 0 ? '−' : '');
+      const cls = signVal > 0 ? 'text-emerald-700' : (signVal < 0 ? 'text-red-600' : 'text-slate-700');
+
+      return `
+        <tr>
+          <td class="p-2 border">${escapeHtml(r.name)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvT)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvC)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvTotal)}</td>
+          <td class="p-2 border text-right">${fmt(r.payT)}</td>
+          <td class="p-2 border text-right">${fmt(r.payC)}</td>
+          <td class="p-2 border text-right">${fmt(r.payTotal)}</td>
+          <td class="p-2 border text-center ${cls}">${label} (${prefix}${fmt(Math.abs(signVal))})</td>
+        </tr>
+      `;
+    }).join('');
+
+    // footer totals (ยังคงเดิม: ใช้ รับรวม-จ่ายรวม สำหรับสรุปรวม)
+    tRecvTransfer.textContent = fmt(totals.recvT);
+    tRecvCash.textContent = fmt(totals.recvC);
+    tRecvTotal.textContent = fmt(totals.recvTotal);
+    tPayTransfer.textContent = fmt(totals.payT);
+    tPayCash.textContent = fmt(totals.payC);
+    tPayTotal.textContent = fmt(totals.payTotal);
+    tNetText.textContent = totals.net < 0 ? 'ลบ' : (totals.net > 0 ? 'บวก' : 'เท่ากัน');
+
+    // dealer / cashier (ยังยึดตาม (รับรวม - จ่ายรวม) ตามที่กำหนดไว้ก่อนหน้า)
+    const base = totals.net;
+    dealerLine.textContent  = `dealer : ${fmt(base * 0.25)} `;
+    cashierLine.textContent = `cashier : ${fmt(base * 0.15)} `;
+  }
+
+
+  document.getElementById('exportCsv').addEventListener('click', () => {
+    const { rows, totals } = buildSummary();
+    const header = [
+      'Name','Received_Transfer','Received_Cash','Received_Total',
+      'Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'
+    ];
+    const lines = [header.join(',')];
+
+    rows.forEach(r=>{
+      const signVal = r.payTotal - r.recvTotal; // จ่าย-รับ (บวกเมื่อจ่ายมากกว่า)
+      lines.push([
+        csvEscape(r.name), r.recvT, r.recvC, r.recvTotal,
+        r.payT, r.payC, r.payTotal, signVal
+      ].join(','));
+    });
+
+    // รวมยอดรวม + dealer/cashier (ฐานยังเป็น (รับรวม-จ่ายรวม) เหมือนเดิม)
+    lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
+    const base = totals.net;
+    lines.push(['DEALER', '', '', '', '', '', '', base * 0.25].join(','));
+    lines.push(['CASHIER','', '', '', '', '', '', base * 0.15].join(','));
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `summary_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+    // ---- Reset ----
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('ยืนยันรีเซ็ตข้อมูลทั้งหมด?')) return;
+      state.receive = [];
+      state.pay = [];
+      saveState();
+      renderReceive();
+      renderPay();
+      refreshNameSelect();
+      renderSummary();
+      alert('ล้างข้อมูลเรียบร้อย');
+    });
+
+    // ---- Render initial ----
+    renderReceive();
+    renderPay();
+    refreshNameSelect();
+
+    // ---- id helper ----
+    function cryptoRandomId(){
+      // ใช้ crypto ถ้าได้; ถ้าไม่ ก็ fallback
+      if (window.crypto && crypto.getRandomValues) {
+        const arr = new Uint32Array(4);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(n=>n.toString(16).padStart(8,'0')).join('');
+      }
+      return 'id_' + Math.random().toString(36).slice(2) + Date.now();
+    }
+  </script>
+</body>
+</html>
