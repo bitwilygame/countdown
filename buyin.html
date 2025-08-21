@@ -332,6 +332,8 @@
     // ---- State & Storage ----
     const KEY = 'receive_pay_app_v1';
     const state = loadState();
+    const DRAFT_KEY = 'receive_pay_form_drafts_v1';
+    const drafts = loadDrafts();
 
     function loadState() {
       const raw = localStorage.getItem(KEY);
@@ -347,6 +349,17 @@
     }
     function saveState() {
       localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    function loadDrafts() {
+      try {
+        return JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
+      } catch {
+        return {};
+      }
+    }
+    function saveDrafts() {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
     }
 
     // ---- Utility ----
@@ -412,6 +425,28 @@
     const recvCash = document.getElementById('recvCash');
     const receiveTbody = document.getElementById('receiveTbody');
 
+    recvName.value = drafts.recvName || '';
+    recvAmount.value = drafts.recvAmount || '';
+    if (drafts.recvMethod === 'transfer') recvTransfer.checked = true;
+    if (drafts.recvMethod === 'cash') recvCash.checked = true;
+
+    recvName.addEventListener('input', () => {
+      drafts.recvName = recvName.value;
+      saveDrafts();
+    });
+    recvAmount.addEventListener('input', () => {
+      drafts.recvAmount = recvAmount.value;
+      saveDrafts();
+    });
+    recvTransfer.addEventListener('change', () => {
+      drafts.recvMethod = recvTransfer.checked ? 'transfer' : (recvCash.checked ? 'cash' : '');
+      saveDrafts();
+    });
+    recvCash.addEventListener('change', () => {
+      drafts.recvMethod = recvCash.checked ? 'cash' : (recvTransfer.checked ? 'transfer' : '');
+      saveDrafts();
+    });
+
     document.getElementById('addReceive').addEventListener('click', () => {
       const name = recvName.value.trim();
       const amount = parseFloat(recvAmount.value);
@@ -426,6 +461,8 @@
       renderReceive();
       refreshNameSelect();
       recvAmount.value = '';
+      drafts.recvAmount = '';
+      saveDrafts();
     });
 
     // ลบรายการรับ (event delegation)
@@ -465,6 +502,28 @@
     const payCash = document.getElementById('payCash');
     const payTbody = document.getElementById('payTbody');
 
+    payName.value = drafts.payName || '';
+    payAmount.value = drafts.payAmount || '';
+    if (drafts.payMethod === 'transfer') payTransfer.checked = true;
+    if (drafts.payMethod === 'cash') payCash.checked = true;
+
+    payName.addEventListener('input', () => {
+      drafts.payName = payName.value;
+      saveDrafts();
+    });
+    payAmount.addEventListener('input', () => {
+      drafts.payAmount = payAmount.value;
+      saveDrafts();
+    });
+    payTransfer.addEventListener('change', () => {
+      drafts.payMethod = payTransfer.checked ? 'transfer' : (payCash.checked ? 'cash' : '');
+      saveDrafts();
+    });
+    payCash.addEventListener('change', () => {
+      drafts.payMethod = payCash.checked ? 'cash' : (payTransfer.checked ? 'transfer' : '');
+      saveDrafts();
+    });
+
     document.getElementById('addPay').addEventListener('click', () => {
       const name = payName.value;
       const amount = parseFloat(payAmount.value);
@@ -478,6 +537,8 @@
       saveState();
       renderPay();
       payAmount.value = '';
+      drafts.payAmount = '';
+      saveDrafts();
     });
 
     // ลบรายการจ่าย
@@ -683,6 +744,16 @@
       rakeInput.value = '';
       tipInput.value = '';
       renderSummary();
+      localStorage.removeItem(DRAFT_KEY);
+      for (const k in drafts) delete drafts[k];
+      recvName.value = '';
+      recvAmount.value = '';
+      recvTransfer.checked = false;
+      recvCash.checked = false;
+      payName.value = '';
+      payAmount.value = '';
+      payTransfer.checked = false;
+      payCash.checked = false;
       alert('ล้างข้อมูลเรียบร้อย');
     });
 
