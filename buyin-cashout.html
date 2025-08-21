@@ -549,7 +549,6 @@
       saveState();
       renderSummary();
     });
-
     calcAccount.addEventListener('click', () => {
       const { totals } = buildSummary();
       const rake = parseFloat(rakeInput.value) || 0;
@@ -559,6 +558,7 @@
         ? 'สถานะบัญชี: บัญชีถูกต้อง'
         : `สถานะบัญชี: -${fmt(Math.abs(acc))}`;
     });
+
 
     function buildSummary() {
       const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
@@ -632,7 +632,6 @@
     cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
 
     accountStatus.textContent = '';
-  }
 
 
   document.getElementById('exportCsv').addEventListener('click', () => {
