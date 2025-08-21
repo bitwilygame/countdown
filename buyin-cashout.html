@@ -145,7 +145,8 @@
           <div class="grid sm:grid-cols-3 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อผู้รับเงิน</label>
-              <input id="recvName" type="text" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="เช่น เอ, บี" />
+              <input id="recvName" list="recvNameList" type="text" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="เช่น เอ, บี" />
+              <datalist id="recvNameList"></datalist>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">จำนวนเงิน</label>
@@ -299,10 +300,21 @@
             <h3 class="font-semibold text-gray-800 mb-2 flex items-center gap-2">
               💼 คำนวณค่าคอมมิชชั่น
             </h3>
+            <div class="grid sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Rake</label>
+                <input id="rakeInput" type="number" step="0.01" class="glass-input w-full px-4 py-2 rounded-xl" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tip</label>
+                <input id="tipInput" type="number" step="0.01" class="glass-input w-full px-4 py-2 rounded-xl" />
+              </div>
+            </div>
             <div class="grid sm:grid-cols-2 gap-4 text-lg">
               <p id="dealerLine" class="text-green-700 font-semibold"></p>
               <p id="cashierLine" class="text-blue-700 font-semibold"></p>
             </div>
+            <p id="accountStatus" class="mt-4 text-center font-semibold"></p>
           </div>
 
           <p class="mt-4 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
@@ -320,7 +332,15 @@
 
     function loadState() {
       const raw = localStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : { receive: [], pay: [] };
+      const defaults = { receive: [], pay: [], rake: 0, tip: 0 };
+      if (raw) {
+        try {
+          return { ...defaults, ...JSON.parse(raw) };
+        } catch {
+          return defaults;
+        }
+      }
+      return defaults;
     }
     function saveState() {
       localStorage.setItem(KEY, JSON.stringify(state));
@@ -383,6 +403,7 @@
 
     // ---- Receive handlers ----
     const recvName = document.getElementById('recvName');
+    const recvNameList = document.getElementById('recvNameList');
     const recvAmount = document.getElementById('recvAmount');
     const recvTransfer = document.getElementById('recvTransfer');
     const recvCash = document.getElementById('recvCash');
@@ -474,6 +495,7 @@
       const prev = payName.value;
       payName.innerHTML = `<option value="" disabled ${prev ? '' : 'selected'}>— เลือกชื่อจากหน้ารับเงิน —</option>` +
         names.map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      recvNameList.innerHTML = names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('');
     }
 
     function renderPay() {
@@ -504,6 +526,23 @@
 
     const dealerLine = document.getElementById('dealerLine');
     const cashierLine = document.getElementById('cashierLine');
+    const rakeInput = document.getElementById('rakeInput');
+    const tipInput = document.getElementById('tipInput');
+    const accountStatus = document.getElementById('accountStatus');
+
+    rakeInput.value = state.rake || '';
+    tipInput.value = state.tip || '';
+
+    rakeInput.addEventListener('input', () => {
+      state.rake = parseFloat(rakeInput.value) || 0;
+      saveState();
+      renderSummary();
+    });
+    tipInput.addEventListener('input', () => {
+      state.tip = parseFloat(tipInput.value) || 0;
+      saveState();
+      renderSummary();
+    });
 
     function buildSummary() {
       const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
@@ -570,10 +609,14 @@
     tPayTotal.textContent = fmt(totals.payTotal);
     tNetText.textContent = totals.net < 0 ? 'ลบ' : (totals.net > 0 ? 'บวก' : 'เท่ากัน');
 
-    // dealer / cashier (ยังยึดตาม (รับรวม - จ่ายรวม) ตามที่กำหนดไว้ก่อนหน้า)
-    const base = totals.net;
-    dealerLine.textContent  = `dealer : ${fmt(base * 0.25)} `;
-    cashierLine.textContent = `cashier : ${fmt(base * 0.1)} `;
+    // dealer / cashier จากค่า rake
+    const rake = parseFloat(rakeInput.value) || 0;
+    const tip = parseFloat(tipInput.value) || 0;
+    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25)} `;
+    cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
+
+    const acc = totals.recvTotal - (totals.payTotal + rake + tip);
+    accountStatus.textContent = acc >= 0 ? 'สถานะบัญชี: บัญชีถูกต้อง' : `สถานะบัญชี: -${fmt(Math.abs(acc))}`;
   }
 
 
@@ -593,11 +636,14 @@
       ].join(','));
     });
 
-    // รวมยอดรวม + dealer/cashier (ฐานยังเป็น (รับรวม-จ่ายรวม) เหมือนเดิม)
+    // รวมยอดรวม + rake/tip/commission
+    const rake = parseFloat(rakeInput.value) || 0;
+    const tip = parseFloat(tipInput.value) || 0;
     lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
-    const base = totals.net;
-    lines.push(['DEALER', '', '', '', '', '', '', base * 0.25].join(','));
-    lines.push(['CASHIER','', '', '', '', '', '', base * 0.15].join(','));
+    lines.push(['RAKE', '', '', '', '', '', '', rake].join(','));
+    lines.push(['TIP', '', '', '', '', '', '', tip].join(','));
+    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25].join(','));
+    lines.push(['CASHIER','', '', '', '', '', '', rake * 0.1].join(','));
 
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -615,10 +661,14 @@
       if (!confirm('ยืนยันรีเซ็ตข้อมูลทั้งหมด?')) return;
       state.receive = [];
       state.pay = [];
+      state.rake = 0;
+      state.tip = 0;
       saveState();
       renderReceive();
       renderPay();
       refreshNameSelect();
+      rakeInput.value = '';
+      tipInput.value = '';
       renderSummary();
       alert('ล้างข้อมูลเรียบร้อย');
     });
@@ -627,6 +677,7 @@
     renderReceive();
     renderPay();
     refreshNameSelect();
+    renderSummary();
 
     // ---- id helper ----
     function cryptoRandomId(){
