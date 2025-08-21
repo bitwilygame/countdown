@@ -314,6 +314,11 @@
               <p id="dealerLine" class="text-green-700 font-semibold"></p>
               <p id="cashierLine" class="text-blue-700 font-semibold"></p>
             </div>
+            <div class="flex justify-center mt-4">
+              <button id="calcAccount" class="gradient-button px-6 py-2 rounded-xl text-white font-medium">
+                คำนวณสถานะบัญชี
+              </button>
+            </div>
             <p id="accountStatus" class="mt-4 text-center font-semibold"></p>
           </div>
 
@@ -529,6 +534,7 @@
     const rakeInput = document.getElementById('rakeInput');
     const tipInput = document.getElementById('tipInput');
     const accountStatus = document.getElementById('accountStatus');
+    const calcAccount = document.getElementById('calcAccount');
 
     rakeInput.value = state.rake || '';
     tipInput.value = state.tip || '';
@@ -543,6 +549,16 @@
       saveState();
       renderSummary();
     });
+    calcAccount.addEventListener('click', () => {
+      const { totals } = buildSummary();
+      const rake = parseFloat(rakeInput.value) || 0;
+      const tip = parseFloat(tipInput.value) || 0;
+      const acc = totals.recvTotal - (totals.payTotal + rake + tip);
+      accountStatus.textContent = acc >= 0
+        ? 'สถานะบัญชี: บัญชีถูกต้อง'
+        : `สถานะบัญชี: -${fmt(Math.abs(acc))}`;
+    });
+
 
     function buildSummary() {
       const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
@@ -612,12 +628,10 @@
     // dealer / cashier จากค่า rake
     const rake = parseFloat(rakeInput.value) || 0;
     const tip = parseFloat(tipInput.value) || 0;
-    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25)} `;
+    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25 + tip)} `;
     cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
 
-    const acc = totals.recvTotal - (totals.payTotal + rake + tip);
-    accountStatus.textContent = acc >= 0 ? 'สถานะบัญชี: บัญชีถูกต้อง' : `สถานะบัญชี: -${fmt(Math.abs(acc))}`;
-  }
+    accountStatus.textContent = '';
 
 
   document.getElementById('exportCsv').addEventListener('click', () => {
@@ -642,7 +656,7 @@
     lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
     lines.push(['RAKE', '', '', '', '', '', '', rake].join(','));
     lines.push(['TIP', '', '', '', '', '', '', tip].join(','));
-    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25].join(','));
+    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25 + tip].join(','));
     lines.push(['CASHIER','', '', '', '', '', '', rake * 0.1].join(','));
 
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
