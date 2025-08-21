@@ -314,6 +314,9 @@
               <p id="dealerLine" class="text-green-700 font-semibold"></p>
               <p id="cashierLine" class="text-blue-700 font-semibold"></p>
             </div>
+            <div class="mt-4 flex justify-center">
+              <button id="calcBtn" class="gradient-button px-6 py-2 rounded-xl text-white font-medium">คำนวณสถานะ</button>
+            </div>
             <p id="accountStatus" class="mt-4 text-center font-semibold"></p>
           </div>
 
@@ -491,11 +494,12 @@
     });
 
     function refreshNameSelect() {
-      const names = Array.from(new Set(state.receive.map(r => r.name))).sort((a,b)=>a.localeCompare(b, 'th'));
+      const recvNames = Array.from(new Set(state.receive.map(r => r.name))).sort((a,b)=>a.localeCompare(b, 'th'));
+      const allNames = Array.from(new Set([...state.receive, ...state.pay].map(r => r.name))).sort((a,b)=>a.localeCompare(b, 'th'));
       const prev = payName.value;
       payName.innerHTML = `<option value="" disabled ${prev ? '' : 'selected'}>— เลือกชื่อจากหน้ารับเงิน —</option>` +
-        names.map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
-      recvNameList.innerHTML = names.map(n => `<option value="${escapeAttr(n)}"></option>`).join('');
+        recvNames.map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      recvNameList.innerHTML = allNames.map(n => `<option value="${escapeAttr(n)}"></option>`).join('');
     }
 
     function renderPay() {
@@ -528,6 +532,7 @@
     const cashierLine = document.getElementById('cashierLine');
     const rakeInput = document.getElementById('rakeInput');
     const tipInput = document.getElementById('tipInput');
+    const calcBtn = document.getElementById('calcBtn');
     const accountStatus = document.getElementById('accountStatus');
 
     rakeInput.value = state.rake || '';
@@ -543,6 +548,8 @@
       saveState();
       renderSummary();
     });
+
+    calcBtn.addEventListener('click', calculateAccount);
 
     function buildSummary() {
       const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
@@ -612,11 +619,17 @@
     // dealer / cashier จากค่า rake
     const rake = parseFloat(rakeInput.value) || 0;
     const tip = parseFloat(tipInput.value) || 0;
-    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25)} `;
+    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25 + tip)} `;
     cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
+    accountStatus.textContent = '';
+  }
 
+  function calculateAccount() {
+    const { totals } = buildSummary();
+    const rake = parseFloat(rakeInput.value) || 0;
+    const tip = parseFloat(tipInput.value) || 0;
     const acc = totals.recvTotal - (totals.payTotal + rake + tip);
-    accountStatus.textContent = acc >= 0 ? 'สถานะบัญชี: บัญชีถูกต้อง' : `สถานะบัญชี: -${fmt(Math.abs(acc))}`;
+    accountStatus.textContent = acc >= 0 ? 'บัญชีถูกต้อง' : `(-${fmt(Math.abs(acc))})`;
   }
 
 
@@ -642,7 +655,7 @@
     lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
     lines.push(['RAKE', '', '', '', '', '', '', rake].join(','));
     lines.push(['TIP', '', '', '', '', '', '', tip].join(','));
-    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25].join(','));
+    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25 + tip].join(','));
     lines.push(['CASHIER','', '', '', '', '', '', rake * 0.1].join(','));
 
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
