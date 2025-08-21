@@ -14,7 +14,7 @@
     .visible-sidebar { transform: translateX(0); }
   </style>
 </head>
-<body class="h-full bg-gray-50 text-white">
+<body class="h-full bg-[hsl(13,45%,25%)] text-white">
   <!-- Sounds -->
   <audio id="alert1min" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
   <audio id="alertEnd" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
@@ -48,7 +48,7 @@
 
       <!-- Timer Controls -->
       <section class="mb-2">
-        <h3 class="text-lg font-semibold mb-2">ควบคุม Blind Timer</h3>
+        <h3 class="text-lg font-semibold mb-2">Blind Timer</h3>
         <div class="flex gap-2">
           <button onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">▶ Start</button>
           <button onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">⏸ Pause</button>
@@ -60,32 +60,38 @@
     <!-- Main -->
     <main class="flex-1 relative flex flex-col items-center justify-center text-center px-4">
       <button onclick="toggleSidebar()" class="absolute top-4 left-4 bg-sky-600 hover:bg-sky-500 px-3 py-1 rounded shadow">☰</button>
+      <button id="fsBtn" onclick="toggleFullscreen()" class="absolute top-4 right-4 bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded shadow">⛶ Full Screen</button>
+
 
       <!-- Shot Clock (ใหญ่) -->
       <div class="flex flex-col items-center select-none">
-        <div id="shotTime" class="font-extrabold leading-none" style="font-size: clamp(12rem, 18vw, 28rem);">00</div>
+        <div id="shotTime" class="font-extrabold leading-none" style="font-size: clamp(12rem, 50vw, 40rem);">00</div>
       </div>
 
       <!-- Divider -->
       <div class="h-6 md:h-8"></div>
 
-      <!-- Blinds (เล็กกว่า) -->
-      <div class="w-full max-w-600px grid grid-cols-1 md:grid-cols-2 items-center gap-4 md:gap-6">
-        <div class="md:col-span-1 order-2 md:order-1 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow">
-          <div class="text-sm uppercase tracking-wide text-white/70">ระดับปัจจุบัน</div>
-          <div id="currentBlind" class="text-3xl sm:text-4xl md:text-5xl font-semibold break-words">SB 100 / BB 200</div>
-          <div id="blindTime" class="mt-2 text-[2rem] sm:text-[2rem] md:text-[6rem] text-white/90">20:00</div>
+      
+      <!-- Blinds (เล็กกว่า) - 2 columns: Left(Current+Next), Right(Blind Clock) -->
+      <div class="w-full max-w-screen-xl grid grid-cols-1 md:grid-cols-2 items-stretch gap-2 md:gap-3">
+        <!-- Left: Current + Next -->
+        <div class="order-2 md:order-1 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col justify-center">
+          <div class="text-sm uppercase tracking-wide text-white/70">Current Blind</div>
+          <div id="currentBlind" class="text-[2rem] sm:text-[2rem] md:text-[4rem] font-semibold break-words">100 / 200</div>
+
+          <div class="mt-4 h-px w-full bg-white/10"></div>
+
+          <div class="mt-4 text-sm uppercase tracking-wide text-white/70">Next Blind</div>
+          <div id="nextBlind" class="text-[1.5rem] sm:text-[1.75rem] md:text-[2rem]">200 /400</div>
         </div>
-        <div class="md:col-span-1 order-3 md:order-2 text-white/70">
-          <div class="text-sm uppercase tracking-wide">ถัดไป</div>
-          <div id="nextBlind" class="text-[1.5rem] sm:text-[1.5rem] md:text-[4rem]">SB 200 / BB 400</div>
-        </div>
-        <div class="md:col-span-1 order-1 md:order-3 flex items-center justify-center gap-3">
-          <button onclick="prevLevel()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl">◀</button>
-          <div class="text-sm">เลเวลที่ <span id="levelIdx">1</span>/<span id="levelTotal">1</span></div>
-          <button onclick="nextLevel()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl">▶</button>
+
+        <!-- Right: Blind Clock -->
+        <div class="order-1 md:order-2 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col items-center justify-center">
+          <div class="text-sm uppercase tracking-wide text-white/70">Blind Clock</div>
+          <div id="blindTime" class="mt-1 text-[2.5rem] sm:text-[3rem] md:text-[5rem] text-white/90 leading-none">20:00</div>
         </div>
       </div>
+
     </main>
   </div>
 
@@ -316,6 +322,20 @@
     renderBlinds();
     renderDisplay();
     shotStart();
+
+    // ===== Fullscreen Toggle =====
+    function toggleFullscreen(){
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.warn(err));
+      } else {
+        document.exitFullscreen().catch(err => console.warn(err));
+      }
+    }
+    document.addEventListener('fullscreenchange', ()=>{
+      const btn = document.getElementById('fsBtn');
+      if(!btn) return;
+      btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
+    });
 
   </script>
 </body>
