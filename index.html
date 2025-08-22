@@ -214,8 +214,10 @@
             currentBlindIndex++;
             blindTimer = (blinds[currentBlindIndex].duration||20)*60;
             renderDisplay();
+            save();
           }else{
             stopBlindTimer();
+            renderDisplay();
           }
         }
       },1000);
