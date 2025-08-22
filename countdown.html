@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>นับเวลาถอยหลัง</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: sans-serif;
+      color: white;
+      transition: background-color 0.1s linear;
+    }
+
+    #container {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: hsl(120, 100%, 30%);
+      transition: background-color 0.1s linear;
+    }
+
+    #time {
+      font-size: 25rem;
+      line-height: 1;
+    }
+
+    input, button {
+      font-size: 2rem;
+      padding: 10px;
+      margin: 10px;
+    }
+
+    #setup {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="setup">
+    <label>เวลา (วินาที):</label>
+    <input type="number" id="seconds" value="30" min="1" />
+    <button onclick="startCountdown()">เริ่ม</button>
+  </div>
+
+  <div id="container">
+    <div id="time">0</div>
+  </div>
+
+  <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+  <script>
+    let duration = 0;
+    let startTime = 0;
+    let endTime = 0;
+    let rafId = null;
+    let lastShownSecond = -1;
+
+    function update() {
+      const now = performance.now();
+      let remaining = Math.max(endTime - now, 0);
+      const seconds = Math.ceil(remaining / 1000);
+      const percent = remaining / (duration * 1000);
+
+      if (seconds !== lastShownSecond) {
+        lastShownSecond = seconds;
+        document.getElementById("time").textContent = seconds > 0 ? seconds : "0";
+
+        // ไล่สีพื้นหลัง: เขียว (120) → แดง (0)
+        const hue = 120 * percent;
+        const bgColor = `hsl(${hue}, 100%, 30%)`;
+
+        document.body.style.backgroundColor = bgColor;
+        document.documentElement.style.backgroundColor = bgColor;
+        document.getElementById("container").style.backgroundColor = bgColor;
+      }
+
+      if (remaining <= 0) {
+        document.getElementById("alarm").play();
+        cancelAnimationFrame(rafId);
+      } else {
+        rafId = requestAnimationFrame(update);
+      }
+    }
+
+    function startCountdown() {
+      const s = parseFloat(document.getElementById("seconds").value);
+      if (s <= 0) return;
+      const alarm = document.getElementById("alarm");
+      alarm.pause();
+      alarm.currentTime = 0;
+      document.getElementById("setup").style.display = "none";
+
+      duration = s;
+      startTime = performance.now();
+      endTime = startTime + duration * 1000;
+
+      enterFullscreen();
+      cancelAnimationFrame(rafId);
+      lastShownSecond = -1;
+      update();
+    }
+
+    // รีเซ็ตเมื่อคลิกหน้าจอ
+    document.body.addEventListener('click', (e) => {
+      if (!e.target.closest('input') && !e.target.closest('button')) {
+        startCountdown();
+      }
+    });
+
+    function enterFullscreen() {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) elem.requestFullscreen();
+      else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+      else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+    }
+  </script>
+</body>
+</html>
