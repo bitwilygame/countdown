@@ -33,7 +33,7 @@
         <h3 class="text-lg font-semibold mb-2">Shot Clock</h3>
         <div class="space-y-2 text-sm">
           <label class="block">ความยาวต่อรอบ (วินาที)
-            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" />
+            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" onchange="updateShotLength()" />
           </label>
           <div class="flex gap-2">
         </div>
@@ -103,7 +103,7 @@
       { sb: 300, bb: 600, duration: 20 }
     ];
     let currentBlindIndex = parseInt(localStorage.getItem('currentBlindIndex') || '0');
-    let blindTimer = (blinds[currentBlindIndex]?.duration || 20) * 60; // seconds
+    let blindTimer = parseInt(localStorage.getItem('blindTimer')) || (blinds[currentBlindIndex]?.duration || 20) * 60; // seconds
     let blindInterval = null;
     let blindPaused = false;
 
@@ -205,10 +205,11 @@
       blindInterval = setInterval(()=>{
         if(blindPaused) return;
         if(blindTimer===60) document.getElementById('alert1min').play();
-        if(blindTimer>0){
-          blindTimer--;
-          renderBlindTime();
-        }else{
+          if(blindTimer>0){
+            blindTimer--;
+            renderBlindTime();
+            save();
+          }else{
           document.getElementById('alertEnd').play();
           if(currentBlindIndex < blinds.length-1){
             currentBlindIndex++;
@@ -272,6 +273,7 @@
       localStorage.setItem('blinds', JSON.stringify(blinds));
       localStorage.setItem('currentBlindIndex', currentBlindIndex);
       localStorage.setItem('shotLen', shotLen);
+      localStorage.setItem('blindTimer', blindTimer);
     }
 
     // ===== Shot clock (RAF) =====
@@ -312,6 +314,12 @@
       shotEnd = performance.now() + shotLen*1000;
       lastShown=-1;
       if(!rafId) rafId = requestAnimationFrame(shotTick);
+    }
+
+    function updateShotLength(){
+      shotLen = parseInt(inputShotLen.value) || shotLen;
+      localStorage.setItem('shotLen', shotLen);
+      shotReset();
     }
 
     // Tap anywhere (outside inputs/buttons) to reset shot clock
