@@ -22,10 +22,10 @@
 
   <div class="flex h-screen">
     <!-- Sidebar (Blinds setup + Controls) -->
-    <aside id="sidebar" class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-120 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
+    <aside id="sidebar" class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-96 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold">ตั้งค่า</h2>
-        <button onclick="toggleSidebar()" class="px-2 py-1 rounded bg-white/10">⟨⟨</button>
+        <button type="button" onclick="toggleSidebar()" class="px-2 py-1 rounded bg-white/10">⟨⟨</button>
       </div>
 
       <!-- Shot Clock Settings -->
@@ -33,9 +33,8 @@
         <h3 class="text-lg font-semibold mb-2">Shot Clock</h3>
         <div class="space-y-2 text-sm">
           <label class="block">ความยาวต่อรอบ (วินาที)
-            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" onchange="updateShotLength()" />
+            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" oninput="updateShotLength()" />
           </label>
-          <div class="flex gap-2">
         </div>
       </section>
 
@@ -43,25 +42,24 @@
       <section class="mb-6">
         <h3 class="text-lg font-semibold mb-2">ระดับ Blind</h3>
         <div id="blindsList" class="space-y-2"></div>
-        <button onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
+        <button type="button" onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
       </section>
 
       <!-- Timer Controls -->
       <section class="mb-2">
         <h3 class="text-lg font-semibold mb-2">Blind Timer</h3>
         <div class="flex gap-2">
-          <button onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">▶ Start</button>
-          <button onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">⏸ Pause</button>
+          <button type="button" onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">▶ Start</button>
+          <button type="button" onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">⸷ Pause</button>
         </div>
-        <button onclick="resetAll()" class="mt-2 w-full bg-rose-700 rounded px-3 py-2">⟲ Reset ทั้งหมด</button>
+        <button type="button" onclick="resetAll()" class="mt-2 w-full bg-rose-700 rounded px-3 py-2">⟲ Reset ทั้งหมด</button>
       </section>
     </aside>
 
     <!-- Main -->
     <main class="flex-1 relative flex flex-col items-center justify-center text-center px-4">
-      <button onclick="toggleSidebar()" class="absolute top-4 left-4 bg-sky-600 hover:bg-sky-500 px-3 py-1 rounded shadow">☰</button>
-      <button id="fsBtn" onclick="toggleFullscreen()" class="absolute top-4 right-4 bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded shadow">⛶ Full Screen</button>
-
+      <button type="button" onclick="toggleSidebar()" class="absolute top-4 left-4 bg-sky-600 hover:bg-sky-500 px-3 py-1 rounded shadow z-50">☰</button>
+      <button type="button" id="fsBtn" onclick="toggleFullscreen()" class="absolute top-4 right-4 bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded shadow z-50">⛶ Full Screen</button>
 
       <!-- Shot Clock (ใหญ่) -->
       <div class="flex flex-col items-center select-none">
@@ -71,13 +69,15 @@
       <!-- Divider -->
       <div class="h-6 md:h-8"></div>
 
-      
       <!-- Blinds (เล็กกว่า) - 2 columns: Left(Current+Next), Right(Blind Clock) -->
       <div class="w-full max-w-screen-xl grid grid-cols-1 md:grid-cols-2 items-stretch gap-1 md:gap-2">
         <!-- Left: Current + Next -->
         <div class="order-2 md:order-1 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col justify-center">
           <div class="text-sm uppercase tracking-wide text-white/70">Current Blind</div>
           <div id="currentBlind" class="text-[2rem] sm:text-[2rem] md:text-[4rem] font-semibold break-words">100 / 200</div>
+
+          <!-- Level label -->
+          <div id="currentLevel" class="mt-1 text-lg text-white/80">Level 1 / 3</div>
 
           <div class="mt-2 h-px w-full bg-white/10"></div>
 
@@ -96,6 +96,14 @@
   </div>
 
   <script>
+    // --- Define globals FIRST to avoid ReferenceError ---
+    window.toggleSidebar = function(){
+      const sidebar = document.getElementById('sidebar');
+      if(!sidebar) return;
+      sidebar.classList.toggle('visible-sidebar');
+      sidebar.classList.toggle('hidden-sidebar');
+    };
+
     // ===== State =====
     let blinds = JSON.parse(localStorage.getItem('blinds')) || [
       { sb: 100, bb: 200, duration: 20 },
@@ -118,16 +126,10 @@
     const elBlind = document.getElementById('blindTime');
     const elCur = document.getElementById('currentBlind');
     const elNext = document.getElementById('nextBlind');
-    const elIdx = document.getElementById('levelIdx');
-    const elTotal = document.getElementById('levelTotal');
+    const elLevel = document.getElementById('currentLevel');
     const pauseBtn = document.getElementById('pauseBtn');
     const inputShotLen = document.getElementById('shotLen');
     inputShotLen.value = shotLen;
-
-    function toggleSidebar(){
-      document.getElementById('sidebar').classList.toggle('visible-sidebar');
-      document.getElementById('sidebar').classList.toggle('hidden-sidebar');
-    }
 
     function addBlind(){
       blinds.push({ sb: 0, bb: 0, duration: 20 });
@@ -163,6 +165,8 @@
         renderBlindTime();
       }
       save();
+      // อัพเดทหน้าจอทันทีหลังจากกรอกข้อมูล
+      renderDisplay();
     }
 
     function renderBlinds(){
@@ -171,26 +175,25 @@
       blinds.forEach((b,i)=>{
         list.innerHTML += `
           <div class="flex items-center gap-2">
-            SB <input type="number" value="${b.sb}" onchange="updateBlind(${i},'sb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            BB <input type="number" value="${b.bb}" onchange="updateBlind(${i},'bb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            Min <input type="number" value="${b.duration}" onchange="updateBlind(${i},'duration',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
+            SB <input type="number" value="${b.sb}" oninput="updateBlind(${i},'sb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
+            BB <input type="number" value="${b.bb}" oninput="updateBlind(${i},'bb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
+            Min <input type="number" value="${b.duration}" oninput="updateBlind(${i},'duration',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
             <div class="ml-auto flex items-center gap-1">
-              <button onclick="moveBlind(${i}, -1)" class="px-2 text-white/80 bg-white/10 rounded">▲</button>
-              <button onclick="moveBlind(${i}, 1)" class="px-2 text-white/80 bg-white/10 rounded">▼</button>
-              <button onclick="deleteBlind(${i})" class="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold">✖</button>
+              <button type="button" onclick="moveBlind(${i}, -1)" class="px-2 text-white/80 bg-white/10 rounded">▲</button>
+              <button type="button" onclick="moveBlind(${i}, 1)" class="px-2 text-white/80 bg-white/10 rounded">▼</button>
+              <button type="button" onclick="deleteBlind(${i})" class="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold">✖</button>
             </div>
           </div>`;
       });
     }
 
     function renderDisplay(){
-      elTotal.textContent = blinds.length;
-      elIdx.textContent = Math.min(currentBlindIndex+1, blinds.length);
       const cur = blinds[currentBlindIndex] || {sb:0, bb:0, duration:0};
       const next = blinds[currentBlindIndex+1];
       const isBreak = cur.sb===0 && cur.bb===0;
       elCur.textContent = isBreak ? 'Break Time' : `${cur.sb} / ${cur.bb}`;
-      elNext.textContent = next? `${next.sb} /${next.bb}` : 'เลเวลสุดท้าย';
+      elNext.textContent = next? `${next.sb} / ${next.bb}` : 'เลเวลสุดท้าย';
+      elLevel.textContent = `Level ${currentBlindIndex+1} / ${blinds.length}`;
       renderBlindTime();
     }
 
@@ -205,11 +208,11 @@
       blindInterval = setInterval(()=>{
         if(blindPaused) return;
         if(blindTimer===60) document.getElementById('alert1min').play();
-          if(blindTimer>0){
-            blindTimer--;
-            renderBlindTime();
-            save();
-          }else{
+        if(blindTimer>0){
+          blindTimer--;
+          renderBlindTime();
+          save();
+        }else{
           document.getElementById('alertEnd').play();
           if(currentBlindIndex < blinds.length-1){
             currentBlindIndex++;
@@ -230,7 +233,7 @@
 
     function togglePause(){
       blindPaused = !blindPaused;
-      pauseBtn.textContent = blindPaused ? '▶ Resume' : '⏸ Pause';
+      pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
     }
 
     function prevLevel(){
@@ -249,7 +252,7 @@
     function resetAll(){
       // stop timers
       stopBlindTimer();
-      blindPaused=false; pauseBtn.textContent='⏸ Pause';
+      blindPaused=false; pauseBtn.textContent='⸷ Pause';
       // reset stored data & UI back to defaults
       localStorage.clear();
       blinds = [
@@ -347,6 +350,19 @@
       btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
     });
 
+    // ===== Minimal Self-Tests (console) =====
+    (function runSelfTests(){
+      try {
+        console.assert(typeof window.toggleSidebar === 'function', 'toggleSidebar should exist');
+        console.assert(!!document.getElementById('sidebar'), '#sidebar exists');
+        console.assert(Array.isArray(blinds), 'blinds should be an array');
+        console.assert(blinds.length > 0, 'blinds should have defaults');
+        console.assert(typeof startBlindTimer === 'function', 'startBlindTimer should exist');
+        console.assert(typeof updateShotLength === 'function', 'updateShotLength should exist');
+      } catch(e){
+        console.error('Self-tests failed', e);
+      }
+    })();
   </script>
 </body>
 </html>
