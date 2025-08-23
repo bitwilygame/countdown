@@ -13,6 +13,24 @@
     .hidden-sidebar { transform: translateX(-100%); }
     .visible-sidebar { transform: translateX(0); }
   </style>
+  <!-- Define toggleSidebar early to avoid ReferenceError from inline onclick -->
+  <script>
+    window.toggleSidebar = function(){
+      var sidebar = document.getElementById('sidebar');
+      if(!sidebar){
+        // If called before DOM is ready, defer one tick
+        document.addEventListener('DOMContentLoaded', function(){
+          var sb = document.getElementById('sidebar');
+          if(!sb) return;
+          sb.classList.toggle('visible-sidebar');
+          sb.classList.toggle('hidden-sidebar');
+        }, { once: true });
+        return;
+      }
+      sidebar.classList.toggle('visible-sidebar');
+      sidebar.classList.toggle('hidden-sidebar');
+    };
+  </script>
 </head>
 <body class="h-full bg-[hsl(13,45%,25%)] text-white">
   <!-- Sounds -->
@@ -41,6 +59,12 @@
       <!-- Blind Settings -->
       <section class="mb-6">
         <h3 class="text-lg font-semibold mb-2">ระดับ Blind</h3>
+        <!-- Column header once at the top -->
+        <div class="flex gap-4 text-xs text-gray-300 font-semibold mb-1 pl-2">
+          <span class="w-16 text-center">SB</span>
+          <span class="w-16 text-center">BB</span>
+          <span class="w-16 text-center">Min</span>
+        </div>
         <div id="blindsList" class="space-y-2"></div>
         <button type="button" onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
       </section>
@@ -82,7 +106,7 @@
           <div class="mt-2 h-px w-full bg-white/10"></div>
 
           <div class="mt-2 text-sm uppercase tracking-wide text-white/70">Next Blind</div>
-          <div id="nextBlind" class="text-[1.5rem] sm:text-[1.75rem] md:text-[2rem]">200 /400</div>
+          <div id="nextBlind" class="text-[1.5rem] sm:text-[1.75rem] md:text-[2rem]">200 / 400</div>
         </div>
 
         <!-- Right: Blind Clock -->
@@ -96,14 +120,6 @@
   </div>
 
   <script>
-    // --- Define globals FIRST to avoid ReferenceError ---
-    window.toggleSidebar = function(){
-      const sidebar = document.getElementById('sidebar');
-      if(!sidebar) return;
-      sidebar.classList.toggle('visible-sidebar');
-      sidebar.classList.toggle('hidden-sidebar');
-    };
-
     // ===== State =====
     let blinds = JSON.parse(localStorage.getItem('blinds')) || [
       { sb: 100, bb: 200, duration: 20 },
@@ -131,22 +147,23 @@
     const inputShotLen = document.getElementById('shotLen');
     inputShotLen.value = shotLen;
 
-    function addBlind(){
+    // ===== Global functions (referenced by inline handlers) =====
+    window.addBlind = function(){
       blinds.push({ sb: 0, bb: 0, duration: 20 });
       save();
       renderBlinds();
       renderDisplay();
-    }
+    };
 
-    function deleteBlind(i){
+    window.deleteBlind = function(i){
       blinds.splice(i,1);
       currentBlindIndex = Math.max(0, Math.min(currentBlindIndex, blinds.length-1));
       save();
       renderBlinds();
       renderDisplay();
-    }
+    };
 
-    function moveBlind(i, dir){
+    window.moveBlind = function(i, dir){
       const j = i + dir;
       if (j < 0 || j >= blinds.length) return;
       const [item] = blinds.splice(i,1);
@@ -156,32 +173,31 @@
       save();
       renderBlinds();
       renderDisplay();
-    }
+    };
 
-    function updateBlind(i, key, val){
+    window.updateBlind = function(i, key, val){
       blinds[i][key] = parseInt(val)||0;
       if(key==='duration' && i===currentBlindIndex){
         blindTimer = blinds[i].duration*60;
         renderBlindTime();
       }
       save();
-      // อัพเดทหน้าจอทันทีหลังจากกรอกข้อมูล
       renderDisplay();
-    }
+    };
 
     function renderBlinds(){
       const list = document.getElementById('blindsList');
       list.innerHTML = '';
       blinds.forEach((b,i)=>{
         list.innerHTML += `
-          <div class="flex items-center gap-2">
-            SB <input type="number" value="${b.sb}" oninput="updateBlind(${i},'sb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            BB <input type="number" value="${b.bb}" oninput="updateBlind(${i},'bb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            Min <input type="number" value="${b.duration}" oninput="updateBlind(${i},'duration',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
+          <div class="flex items-center gap-2 bg-gray-700/30 p-2 rounded">
+            <input type="number" value="${b.sb}" oninput="updateBlind(${i},'sb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1" aria-label="SB">
+            <input type="number" value="${b.bb}" oninput="updateBlind(${i},'bb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1" aria-label="BB">
+            <input type="number" value="${b.duration}" oninput="updateBlind(${i},'duration',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1" aria-label="Min">
             <div class="ml-auto flex items-center gap-1">
-              <button type="button" onclick="moveBlind(${i}, -1)" class="px-2 text-white/80 bg-white/10 rounded">▲</button>
-              <button type="button" onclick="moveBlind(${i}, 1)" class="px-2 text-white/80 bg-white/10 rounded">▼</button>
-              <button type="button" onclick="deleteBlind(${i})" class="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold">✖</button>
+              <button type="button" onclick="moveBlind(${i}, -1)" class="px-2 text-white/80 bg-white/10 rounded" title="Move up">▲</button>
+              <button type="button" onclick="moveBlind(${i}, 1)" class="px-2 text-white/80 bg-white/10 rounded" title="Move down">▼</button>
+              <button type="button" onclick="deleteBlind(${i})" class="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold" title="Delete">✖</button>
             </div>
           </div>`;
       });
@@ -203,7 +219,7 @@
       elBlind.textContent = `${m}:${s}`;
     }
 
-    function startBlindTimer(){
+    window.startBlindTimer = function(){
       if(blindInterval) return;
       blindInterval = setInterval(()=>{
         if(blindPaused) return;
@@ -225,16 +241,16 @@
           }
         }
       },1000);
-    }
+    };
 
     function stopBlindTimer(){
       clearInterval(blindInterval); blindInterval=null;
     }
 
-    function togglePause(){
+    window.togglePause = function(){
       blindPaused = !blindPaused;
       pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
-    }
+    };
 
     function prevLevel(){
       currentBlindIndex = Math.max(0, currentBlindIndex-1);
@@ -249,11 +265,9 @@
       renderDisplay();
     }
 
-    function resetAll(){
-      // stop timers
+    window.resetAll = function(){
       stopBlindTimer();
       blindPaused=false; pauseBtn.textContent='⸷ Pause';
-      // reset stored data & UI back to defaults
       localStorage.clear();
       blinds = [
         { sb: 100, bb: 200, duration: 20 },
@@ -267,10 +281,9 @@
       save();
       renderBlinds();
       renderDisplay();
-      // reset shot clock clean start
       shotStop();
       shotStart();
-    }
+    };
 
     function save(){
       localStorage.setItem('blinds', JSON.stringify(blinds));
@@ -279,7 +292,6 @@
       localStorage.setItem('blindTimer', blindTimer);
     }
 
-    // ===== Shot clock (RAF) =====
     function shotTick(){
       const now = performance.now();
       const remaining = Math.max(shotEnd - now, 0);
@@ -287,7 +299,6 @@
       if(secs !== lastShown){
         lastShown = secs;
         elShot.textContent = String(Math.max(secs,0)).padStart(2,'0');
-        // subtle hue from green->red on lighter bg
         const pct = Math.max(remaining / (shotLen*1000), 0);
         const hue = Math.round(120*pct);
         document.body.style.backgroundColor = `hsl(${hue}, 45%, 25%)`;
@@ -300,7 +311,6 @@
     }
 
     function shotStart(){
-      // from input
       const v = parseInt(inputShotLen.value||shotLen);
       if(v>0) { shotLen = v; save(); }
       shotEnd = performance.now() + shotLen*1000;
@@ -319,11 +329,11 @@
       if(!rafId) rafId = requestAnimationFrame(shotTick);
     }
 
-    function updateShotLength(){
+    window.updateShotLength = function(){
       shotLen = parseInt(inputShotLen.value) || shotLen;
       localStorage.setItem('shotLen', shotLen);
       shotReset();
-    }
+    };
 
     // Tap anywhere (outside inputs/buttons) to reset shot clock
     document.body.addEventListener('click', (e)=>{
@@ -337,28 +347,36 @@
     shotStart();
 
     // ===== Fullscreen Toggle =====
-    function toggleFullscreen(){
+    window.toggleFullscreen = function(){
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => console.warn(err));
       } else {
         document.exitFullscreen().catch(err => console.warn(err));
       }
-    }
+    };
     document.addEventListener('fullscreenchange', ()=>{
       const btn = document.getElementById('fsBtn');
       if(!btn) return;
       btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
     });
 
-    // ===== Minimal Self-Tests (console) =====
+    // ===== Minimal self-tests =====
     (function runSelfTests(){
       try {
+        console.group('Self-tests');
         console.assert(typeof window.toggleSidebar === 'function', 'toggleSidebar should exist');
         console.assert(!!document.getElementById('sidebar'), '#sidebar exists');
-        console.assert(Array.isArray(blinds), 'blinds should be an array');
-        console.assert(blinds.length > 0, 'blinds should have defaults');
-        console.assert(typeof startBlindTimer === 'function', 'startBlindTimer should exist');
-        console.assert(typeof updateShotLength === 'function', 'updateShotLength should exist');
+        const beforeHidden = document.getElementById('sidebar').classList.contains('hidden-sidebar');
+        window.toggleSidebar();
+        const afterToggle = document.getElementById('sidebar').classList.contains('hidden-sidebar');
+        console.assert(afterToggle !== beforeHidden, 'toggleSidebar flips classes');
+        // toggle back
+        window.toggleSidebar();
+
+        console.assert(Array.isArray(blinds) && blinds.length > 0, 'blinds default array exists');
+        console.assert(typeof window.updateShotLength === 'function', 'updateShotLength exists');
+        console.assert(typeof window.startBlindTimer === 'function', 'startBlindTimer exists');
+        console.groupEnd();
       } catch(e){
         console.error('Self-tests failed', e);
       }
