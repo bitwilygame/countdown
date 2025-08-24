@@ -231,23 +231,33 @@
       pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
     };
 
-    window.resetAll = function(){
-      // Reset timers only — do NOT clear or reinitialize user data
-      stopBlindTimer();
-      blindPaused=false; pauseBtn.textContent='⸷ Pause';
-      // keep current blinds and index; just reset the blind timer to current level
-      const cur = blinds[currentBlindIndex] || { duration: 20 };
-      blindTimer = (cur.duration||20)*60;
-      renderBlindTime();
-      // keep shot length; just restart shot clock from full time
-      shotStop();
-      shotStart();
-      // persist current state (without clearing storage)
-      save();
-      // refresh UI without altering user-entered values
-      renderBlinds();
-      renderDisplay();
-    };
+
+  window.resetAll = function(){
+    // หยุดตัวจับเวลา Blind และเคลียร์สถานะหยุดชั่วคราว
+    stopBlindTimer();
+    blindPaused = false;
+    pauseBtn.textContent = '⸷ Pause';
+
+    // ⬇️ รีเซ็ตกลับไปที่เลเวล 1 (index = 0)
+    currentBlindIndex = 0;
+
+    // ตั้งเวลา Blind ของเลเวลแรก
+    const cur = blinds[currentBlindIndex] || { duration: 20 };
+    blindTimer = (cur.duration || 20) * 60;
+
+    // อัปเดตหน้าจอให้สอดคล้องกับเลเวลใหม่
+    renderDisplay();
+
+    // รีสตาร์ท Shot Clock ตามความยาวที่ตั้งไว้
+    shotStop();
+    shotStart();
+
+    // บันทึกสถานะล่าสุด (รวม currentBlindIndex = 0)
+    save();
+
+    // (ไม่จำเป็นมาก แต่ช่วยให้ sidebar sync ทันที)
+    renderBlinds();
+  };
 
     function save(){
       localStorage.setItem('blinds', JSON.stringify(blinds));
