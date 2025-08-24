@@ -3,25 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shot Clock + Blinds</title>
-  <script src="https://cdn.tailwindcss.com">    // Extra test: ensure blindTimer is not saved to storage
-    (function storageTest(){
-      try {
-        save();
-        console.assert(!localStorage.getItem('blindTimer'), 'blindTimer should not be stored in localStorage');
-      } catch(e){ console.warn('storageTest skipped', e); }
-    })();
-  </script>
+  <title>Shot Clock + Blinds (Display-only & Silent)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     html, body { height: 100%; }
     body { font-family: 'Noto Sans', sans-serif; }
+    /* Display-only: disable text selection everywhere */
+    * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .slide-in { transition: transform .25s ease; }
     .hidden-sidebar { transform: translateX(-100%); }
     .visible-sidebar { transform: translateX(0); }
   </style>
   <script>
-    // Make sure toggleSidebar exists before DOM loads
+    // Ensure toggleSidebar exists before DOM loads
     window.toggleSidebar = function(){
       var sidebar = document.getElementById('sidebar');
       if(!sidebar){
@@ -39,11 +34,6 @@
   </script>
 </head>
 <body class="h-full bg-[hsl(13,45%,25%)] text-white">
-  <!-- Sounds -->
-  <audio id="alert1min" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-  <audio id="alertEnd" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
-  <audio id="shotBeep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
-
   <div class="flex h-screen">
     <!-- Sidebar -->
     <aside id="sidebar" class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-96 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
@@ -216,13 +206,11 @@
       if(blindInterval) return;
       blindInterval = setInterval(()=>{
         if(blindPaused) return;
-        if(blindTimer===60) document.getElementById('alert1min').play();
         if(blindTimer>0){
           blindTimer--;
           renderBlindTime();
           save();
         }else{
-          document.getElementById('alertEnd').play();
           if(currentBlindIndex < blinds.length-1){
             currentBlindIndex++;
             blindTimer = (blinds[currentBlindIndex].duration||20)*60;
@@ -264,7 +252,8 @@
     function save(){
       localStorage.setItem('blinds', JSON.stringify(blinds));
       localStorage.setItem('currentBlindIndex', currentBlindIndex);
-      localStorage.setItem('shotLen', shotLen);}
+      localStorage.setItem('shotLen', shotLen);
+    }
 
     function shotTick(){
       const now = performance.now();
@@ -278,7 +267,6 @@
         document.body.style.backgroundColor = `hsl(${hue}, 45%, 25%)`;
       }
       if(remaining<=0){
-        document.getElementById('shotBeep').play();
         cancelAnimationFrame(rafId); rafId=null; return;
       }
       rafId = requestAnimationFrame(shotTick);
@@ -311,8 +299,10 @@
       if(e.target.closest('input') || e.target.closest('button') || e.target.closest('#sidebar')) return;
       shotReset();
     });
-    // Stop persisting blind timer entirely (cleanup legacy key once)
-    try { localStorage.removeItem('blindTimer'); } catch(_){}
+
+    // Cleanup legacy key once (we do not store blindTimer explicitly)
+    try { localStorage.removeItem('blindTimer'); } catch(_){ }
+
     renderBlinds();
     renderDisplay();
     shotStart();
