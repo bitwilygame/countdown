@@ -313,9 +313,7 @@
               <p id="dealerLine" class="text-green-700 font-semibold"></p>
               <p id="cashierLine" class="text-blue-700 font-semibold"></p>
             </div>
-            <div class="mt-4 flex justify-center">
-              <button id="calcBtn" class="gradient-button px-6 py-2 rounded-xl text-white font-medium">คำนวณสถานะ</button>
-            </div>
+            <!-- ปรับเป็นคำนวณอัตโนมัติ: ตัดปุ่มคำนวณออก -->
             <p id="accountStatus" class="mt-4 text-center font-semibold"></p>
           </div>
         </div>
@@ -376,7 +374,7 @@
       return d.toLocaleString('th-TH');
     }
     function sum(arr){ return arr.reduce((a,b)=>a+Number(b||0),0); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;' }[m])); }
     function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
     function csvEscape(s){
       const str = String(s ?? '');
@@ -455,6 +453,7 @@
       saveState();
       renderReceive();
       refreshNameSelect();
+      renderSummary(); // อัปเดตสรุป+สถานะบัญชีอัตโนมัติ
       recvAmount.value = '';
       drafts.recvAmount = '';
       saveDrafts();
@@ -471,6 +470,7 @@
         saveState();
         renderReceive();
         refreshNameSelect();
+        renderSummary(); // อัปเดตสรุป+สถานะบัญชีอัตโนมัติ
       }
     });
 
@@ -531,6 +531,7 @@
       state.pay.push({ id: cryptoRandomId(), ts: Date.now(), time: nowStr(), name, amount, method });
       saveState();
       renderPay();
+      renderSummary(); // อัปเดตสรุป+สถานะบัญชีอัตโนมัติ
       payAmount.value = '';
       drafts.payAmount = '';
       saveDrafts();
@@ -546,6 +547,7 @@
         state.pay.splice(idx, 1);
         saveState();
         renderPay();
+        renderSummary(); // อัปเดตสรุป+สถานะบัญชีอัตโนมัติ
       }
     });
 
@@ -588,7 +590,6 @@
     const cashierLine = document.getElementById('cashierLine');
     const rakeInput = document.getElementById('rakeInput');
     const tipInput = document.getElementById('tipInput');
-    const calcBtn = document.getElementById('calcBtn');
     const accountStatus = document.getElementById('accountStatus');
 
     rakeInput.value = state.rake || '';
@@ -597,15 +598,13 @@
     rakeInput.addEventListener('input', () => {
       state.rake = parseFloat(rakeInput.value) || 0;
       saveState();
-      renderSummary();
+      renderSummary(); // คำนวณสถานะบัญชีอัตโนมัติเมื่อมีการกรอก
     });
     tipInput.addEventListener('input', () => {
       state.tip = parseFloat(tipInput.value) || 0;
       saveState();
-      renderSummary();
+      renderSummary(); // คำนวณสถานะบัญชีอัตโนมัติเมื่อมีการกรอก
     });
-
-    calcBtn.addEventListener('click', calculateAccount);
 
     function buildSummary() {
       const names = new Set([...state.receive.map(r=>r.name), ...state.pay.map(r=>r.name)]);
@@ -641,89 +640,91 @@
       return { rows, totals };
     }
 
-  function renderSummary() {
-    const { rows, totals } = buildSummary();
-    summaryTbody.innerHTML = rows.map(r => {
-      const signVal = r.payTotal - r.recvTotal; // กติกาใหม่: จ่าย-รับ
-      const label = signVal > 0 ? 'บวก' : (signVal < 0 ? 'ลบ' : 'เท่ากัน');
-      const prefix = signVal > 0 ? '+' : (signVal < 0 ? '−' : '');
-      const cls = signVal > 0 ? 'text-emerald-700' : (signVal < 0 ? 'text-red-600' : 'text-slate-700');
+    function renderSummary() {
+      const { rows, totals } = buildSummary();
+      summaryTbody.innerHTML = rows.map(r => {
+        const signVal = r.payTotal - r.recvTotal; // กติกาใหม่: จ่าย-รับ
+        const label = signVal > 0 ? 'บวก' : (signVal < 0 ? 'ลบ' : 'เท่ากัน');
+        const prefix = signVal > 0 ? '+' : (signVal < 0 ? '−' : '');
+        const cls = signVal > 0 ? 'text-emerald-700' : (signVal < 0 ? 'text-red-600' : 'text-slate-700');
 
-      return `
-        <tr>
-          <td class="p-2 border">${escapeHtml(r.name)}</td>
-          <td class="p-2 border text-right">${fmt(r.recvT)}</td>
-          <td class="p-2 border text-right">${fmt(r.recvC)}</td>
-          <td class="p-2 border text-right">${fmt(r.recvTotal)}</td>
-          <td class="p-2 border text-right">${fmt(r.payT)}</td>
-          <td class="p-2 border text-right">${fmt(r.payC)}</td>
-          <td class="p-2 border text-right">${fmt(r.payTotal)}</td>
-          <td class="p-2 border text-center ${cls}">${label} (${prefix}${fmt(Math.abs(signVal))})</td>
-        </tr>
-      `;
-    }).join('');
+        return `
+          <tr>
+            <td class="p-2 border">${escapeHtml(r.name)}</td>
+            <td class="p-2 border text-right">${fmt(r.recvT)}</td>
+            <td class="p-2 border text-right">${fmt(r.recvC)}</td>
+            <td class="p-2 border text-right">${fmt(r.recvTotal)}</td>
+            <td class="p-2 border text-right">${fmt(r.payT)}</td>
+            <td class="p-2 border text-right">${fmt(r.payC)}</td>
+            <td class="p-2 border text-right">${fmt(r.payTotal)}</td>
+            <td class="p-2 border text-center ${cls}">${label} (${prefix}${fmt(Math.abs(signVal))})</td>
+          </tr>
+        `;
+      }).join('');
 
-    // footer totals (ยังคงเดิม: ใช้ รับรวม-จ่ายรวม สำหรับสรุปรวม)
-    tRecvTransfer.textContent = fmt(totals.recvT);
-    tRecvCash.textContent = fmt(totals.recvC);
-    tRecvTotal.textContent = fmt(totals.recvTotal);
-    tPayTransfer.textContent = fmt(totals.payT);
-    tPayCash.textContent = fmt(totals.payC);
-    tPayTotal.textContent = fmt(totals.payTotal);
-    tNetText.textContent = totals.net < 0 ? 'ลบ' : (totals.net > 0 ? 'บวก' : 'เท่ากัน');
+      // footer totals (ยังคงเดิม: ใช้ รับรวม-จ่ายรวม สำหรับสรุปรวม)
+      tRecvTransfer.textContent = fmt(totals.recvT);
+      tRecvCash.textContent = fmt(totals.recvC);
+      tRecvTotal.textContent = fmt(totals.recvTotal);
+      tPayTransfer.textContent = fmt(totals.payT);
+      tPayCash.textContent = fmt(totals.payC);
+      tPayTotal.textContent = fmt(totals.payTotal);
+      tNetText.textContent = totals.net < 0 ? 'ลบ' : (totals.net > 0 ? 'บวก' : 'เท่ากัน');
 
-    // dealer / cashier จากค่า rake
-    const rake = parseFloat(rakeInput.value) || 0;
-    const tip = parseFloat(tipInput.value) || 0;
-    dealerLine.textContent  = `dealer : ${fmt(rake * 0.25 + tip)} `;
-    cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
-    accountStatus.textContent = '';
-  }
+      // dealer / cashier จากค่า rake
+      const rake = parseFloat(rakeInput.value) || 0;
+      const tip = parseFloat(tipInput.value) || 0;
+      dealerLine.textContent  = `dealer : ${fmt(rake * 0.25 + tip)} `;
+      cashierLine.textContent = `cashier : ${fmt(rake * 0.1)} `;
 
-  function calculateAccount() {
-    const { totals } = buildSummary();
-    const rake = parseFloat(rakeInput.value) || 0;
-    const tip = parseFloat(tipInput.value) || 0;
-    const acc = totals.recvTotal - (totals.payTotal + rake + tip);
-    accountStatus.textContent = acc >= 0 ? 'บัญชีถูกต้อง' : `(-${fmt(Math.abs(acc))})`;
-  }
+      // คำนวณสถานะบัญชีอัตโนมัติ + จัดสีตามเงื่อนไข
+      const acc = totals.recvTotal - (totals.payTotal + rake + tip);
+      accountStatus.classList.remove('text-green-700','text-red-700');
+      if (acc === 0) {
+        accountStatus.textContent = 'บัญชีถูกต้อง';
+        accountStatus.classList.add('text-green-700');
+      } else {
+        const sign = acc > 0 ? '+' : '-';
+        accountStatus.textContent = `${sign}${fmt(Math.abs(acc))}`;
+        accountStatus.classList.add('text-red-700');
+      }
+    }
 
+    document.getElementById('exportCsv').addEventListener('click', () => {
+      const { rows, totals } = buildSummary();
+      const header = [
+        'Name','Received_Transfer','Received_Cash','Received_Total',
+        'Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'
+      ];
+      const lines = [header.join(',')];
 
-  document.getElementById('exportCsv').addEventListener('click', () => {
-    const { rows, totals } = buildSummary();
-    const header = [
-      'Name','Received_Transfer','Received_Cash','Received_Total',
-      'Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'
-    ];
-    const lines = [header.join(',')];
+      rows.forEach(r=>{
+        const signVal = r.payTotal - r.recvTotal; // จ่าย-รับ (บวกเมื่อจ่ายมากกว่า)
+        lines.push([
+          csvEscape(r.name), r.recvT, r.recvC, r.recvTotal,
+          r.payT, r.payC, r.payTotal, signVal
+        ].join(','));
+      });
 
-    rows.forEach(r=>{
-      const signVal = r.payTotal - r.recvTotal; // จ่าย-รับ (บวกเมื่อจ่ายมากกว่า)
-      lines.push([
-        csvEscape(r.name), r.recvT, r.recvC, r.recvTotal,
-        r.payT, r.payC, r.payTotal, signVal
-      ].join(','));
+      // รวมยอดรวม + rake/tip/commission
+      const rake = parseFloat(rakeInput.value) || 0;
+      const tip = parseFloat(tipInput.value) || 0;
+      lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
+      lines.push(['RAKE', '', '', '', '', '', '', rake].join(','));
+      lines.push(['TIP', '', '', '', '', '', '', tip].join(','));
+      lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25 + tip].join(','));
+      lines.push(['CASHIER','', '', '', '', '', '', rake * 0.1].join(','));
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `summary_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     });
-
-    // รวมยอดรวม + rake/tip/commission
-    const rake = parseFloat(rakeInput.value) || 0;
-    const tip = parseFloat(tipInput.value) || 0;
-    lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
-    lines.push(['RAKE', '', '', '', '', '', '', rake].join(','));
-    lines.push(['TIP', '', '', '', '', '', '', tip].join(','));
-    lines.push(['DEALER', '', '', '', '', '', '', rake * 0.25 + tip].join(','));
-    lines.push(['CASHIER','', '', '', '', '', '', rake * 0.1].join(','));
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `summary_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
 
     // ---- Reset ----
     document.getElementById('resetBtn').addEventListener('click', () => {
