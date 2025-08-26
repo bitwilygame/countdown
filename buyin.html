@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>รับ—จ่าย + สรุป CSV </title>
+  <title>รับ—จ่าย + สรุป CSV (Unified)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -277,7 +277,7 @@
     function fmt(n) { return Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function nowStr() { const d = new Date(); return d.toLocaleString('th-TH'); }
     function sum(arr){ return arr.reduce((a,b)=>a+Number(b||0),0); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[m])); }
     function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
     function csvEscape(s){ const str = String(s ?? ''); return /[",\n]/.test(str) ? `"${str.replace(/"/g,'""')}"` : str; }
 
@@ -365,11 +365,11 @@
     function renderReceive() {
       receiveTbody.innerHTML = state.receive.slice().reverse().map(r => `
         <tr>
-          <td class=\"p-2 border\">${r.time}</td>
-          <td class=\"p-2 border\">${escapeHtml(r.name)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.amount)}</td>
-          <td class=\"p-2 border\">${r.method}</td>
-          <td class=\"p-2 border text-center\"><button data-del-id=\"${escapeAttr(r.id)}\" class=\"px-2 py-1 rounded border hover:bg-red-50 text-red-700\">ลบ</button></td>
+          <td class="p-2 border">${r.time}</td>
+          <td class="p-2 border">${escapeHtml(r.name)}</td>
+          <td class="p-2 border text-right">${fmt(r.amount)}</td>
+          <td class="p-2 border">${r.method}</td>
+          <td class="p-2 border text-center"><button data-del-id="${escapeAttr(r.id)}" class="px-2 py-1 rounded border hover:bg-red-50 text-red-700">ลบ</button></td>
         </tr>`).join('');
     }
 
@@ -410,25 +410,25 @@
       const allNames = Array.from(new Set([...state.receive, ...state.pay].map(r => r.name))).sort((a,b)=>a.localeCompare(b, 'th'));
       const prev = payName.value;
       const fixed = ['Dealer','Cashier'];
-      payName.innerHTML = `<option value=\"\" disabled ${prev ? '' : 'selected'}>— เลือกชื่อจากหน้ารับเงิน —</option>` +
-        fixed.map(n => `<option ${prev===n?'selected':''} value=\"${escapeAttr(n)}\">${n}</option>`).join('') +
-        recvNames.filter(n => !fixed.includes(n)).map(n => `<option ${prev===n?'selected':''} value=\"${escapeAttr(n)}\">${escapeHtml(n)}</option>`).join('');
+      payName.innerHTML = `<option value="" disabled ${prev ? '' : 'selected'}>— เลือกชื่อจากหน้ารับเงิน —</option>` +
+        fixed.map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${n}</option>`).join('') +
+        recvNames.filter(n => !fixed.includes(n)).map(n => `<option ${prev===n?'selected':''} value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
       // datalist (สำหรับ auto-complete หน้า รับเงิน)
-      recvNameList.innerHTML = Array.from(new Set([...fixed, ...allNames])).map(n => `<option value=\"${escapeAttr(n)}\"></option>`).join('');
+      recvNameList.innerHTML = Array.from(new Set([...fixed, ...allNames])).map(n => `<option value="${escapeAttr(n)}"></option>`).join('');
     }
 
     function renderPay() {
       payTbody.innerHTML = state.pay.slice().reverse().map(r => `
         <tr>
-          <td class=\"p-2 border\">${r.time}</td>
-          <td class=\"p-2 border\">${escapeHtml(r.name)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.amount)}</td>
-          <td class=\"p-2 border\">${r.method}</td>
-          <td class=\"p-2 border text-center\"><button data-del-id=\"${escapeAttr(r.id)}\" class=\"px-2 py-1 rounded border hover:bg-red-50 text-red-700\">ลบ</button></td>
+          <td class="p-2 border">${r.time}</td>
+          <td class="p-2 border">${escapeHtml(r.name)}</td>
+          <td class="p-2 border text-right">${fmt(r.amount)}</td>
+          <td class="p-2 border">${r.method}</td>
+          <td class="p-2 border text-center"><button data-del-id="${escapeAttr(r.id)}" class="px-2 py-1 rounded border hover:bg-red-50 text-red-700">ลบ</button></td>
         </tr>`).join('');
     }
 
-    // ---- Summary & CSV ----
+    // ---- Summary helpers (UNIFY CALC) ----
     const summaryTbody = document.getElementById('summaryTbody');
     const tRecvTransfer = document.getElementById('tRecvTransfer');
     const tRecvCash = document.getElementById('tRecvCash');
@@ -468,6 +468,25 @@
       return { rows, totals };
     }
 
+    // NEW: one place to compute by-method totals & finals (USED BY DISPLAY + CSV)
+    function computeFinalsByMethod(){
+      const recvCashOnly = sum(state.receive.filter(r=>r.method==='เงินสด').map(r=>r.amount));
+      const recvTransferOnly = sum(state.receive.filter(r=>r.method==='โอน').map(r=>r.amount));
+      const payCashOnly = sum(state.pay.filter(r=>r.method==='เงินสด').map(r=>r.amount));
+      const payTransferOnly = sum(state.pay.filter(r=>r.method==='โอน').map(r=>r.amount));
+      const finalCash = (state.startCash + recvCashOnly) - payCashOnly; // ✔️ สูตรเดียวกับ Display
+      const finalTransfer = (state.startTransfer + recvTransferOnly) - payTransferOnly; // ✔️ สูตรเดียวกับ Display
+      return { recvCashOnly, recvTransferOnly, payCashOnly, payTransferOnly, finalCash, finalTransfer };
+    }
+
+    function computeCommissions(rake, tip){
+      const dealerAmt = Math.round(rake * 0.25 + tip); // match Display (rounded)
+      const cashierAmt = Math.round(rake * 0.10);
+      // เงินเข้าบ้าน = rake - (dealer ไม่รวม tip + cashier)
+      const houseIncome = rake - ((dealerAmt - tip) + cashierAmt);
+      return { dealerAmt, cashierAmt, houseIncome };
+    }
+
     function renderSummary() {
       const { rows, totals } = buildSummary();
       summaryTbody.innerHTML = rows.map(r => {
@@ -476,14 +495,14 @@
         const prefix = signVal > 0 ? '+' : (signVal < 0 ? '−' : '');
         const cls = signVal > 0 ? 'text-emerald-700' : (signVal < 0 ? 'text-red-600' : 'text-slate-700');
         return `<tr>
-          <td class=\"p-2 border\">${escapeHtml(r.name)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.recvT)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.recvC)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.recvTotal)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.payT)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.payC)}</td>
-          <td class=\"p-2 border text-right\">${fmt(r.payTotal)}</td>
-          <td class=\"p-2 border text-center ${cls}\">${label} (${prefix}${fmt(Math.abs(signVal))})</td>
+          <td class="p-2 border">${escapeHtml(r.name)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvT)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvC)}</td>
+          <td class="p-2 border text-right">${fmt(r.recvTotal)}</td>
+          <td class="p-2 border text-right">${fmt(r.payT)}</td>
+          <td class="p-2 border text-right">${fmt(r.payC)}</td>
+          <td class="p-2 border text-right">${fmt(r.payTotal)}</td>
+          <td class="p-2 border text-center ${cls}">${label} (${prefix}${fmt(Math.abs(signVal))})</td>
         </tr>`;
       }).join('');
 
@@ -499,52 +518,36 @@
       // dealer / cashier (แสดงผลเท่านั้น ไม่หักในเงินสุดท้าย)
       const rake = parseFloat(rakeInput.value) || 0;
       const tip = parseFloat(tipInput.value) || 0;
-      const dealerAmt = Math.round(rake * 0.25 + tip);
-      const cashierAmt = Math.round(rake * 0.1);
+      const { dealerAmt, cashierAmt, houseIncome } = computeCommissions(rake, tip);
       dealerLine.textContent  = `dealer : ${dealerAmt.toLocaleString('th-TH')}`;
       cashierLine.textContent = `cashier : ${cashierAmt.toLocaleString('th-TH')}`;
 
-      // สถานะบัญชี: (เข้ารวม - ออกรวม) - (rake - (dealer+cashier))
+      // สถานะบัญชี: (เข้ารวม - ออกรวม) - เงินเข้าบ้าน
       const inMinusOut = totals.recvTotal - totals.payTotal;
-      const houseIncome = rake - ((dealerAmt-tip) + cashierAmt);
       const accountBalance = inMinusOut - houseIncome;
-
       const sign = accountBalance > 0 ? '+' : (accountBalance < 0 ? '−' : '');
       accountStatus.className = 'mt-4 text-center font-semibold ' + (accountBalance === 0 ? 'text-green-700' : 'text-red-700');
       accountStatus.textContent = accountBalance === 0 
         ? 'สถานะบัญชีถูกต้อง' 
         : `สถานะบัญชีผิด: ${sign}${fmt(Math.abs(accountBalance))}`;
 
-
-      
-
-     // เงินสุดท้าย (สูตรใหม่): แยกเงินสดและโอนตามวิธี
-      const recvCashOnly = sum(state.receive.filter(r=>r.method==='เงินสด').map(r=>r.amount));
-      const recvTransferOnly = sum(state.receive.filter(r=>r.method==='โอน').map(r=>r.amount));
-      const payCashOnly = sum(state.pay.filter(r=>r.method==='เงินสด').map(r=>r.amount));
-      const payTransferOnly = sum(state.pay.filter(r=>r.method==='โอน').map(r=>r.amount));
-      
-      const finalCash = (state.startCash + recvCashOnly) - payCashOnly;
-      const finalTransfer = (state.startTransfer + recvTransferOnly) - payTransferOnly;
-
+      // เงินสุดท้าย (สูตรเดียวกับ CSV)
+      const { finalCash, finalTransfer } = computeFinalsByMethod();
       finalLines.innerHTML = `
-        <div>💵 เงินสดสุดท้าย = <span class=\"font-bold\">${fmt(finalCash)}</span></div>
-        <div>💳 เงินบัญชีสุดท้าย = <span class=\"font-bold\">${fmt(finalTransfer)}</span></div>`;
+        <div>💵 เงินสดสุดท้าย = <span class="font-bold">${fmt(finalCash)}</span></div>
+        <div>💳 เงินบัญชีสุดท้าย = <span class="font-bold">${fmt(finalTransfer)}</span></div>`;
     }
 
     document.getElementById('exportCsv').addEventListener('click', () => {
       const { rows, totals } = buildSummary();
       const rake = parseFloat(rakeInput.value) || 0; const tip = parseFloat(tipInput.value) || 0;
-      const dealerAmt = rake * 0.25 + tip; const cashierAmt = rake * 0.1;
+      const { dealerAmt, cashierAmt, houseIncome } = computeCommissions(rake, tip);
 
-      const finalCash = (state.startCash + totals.recvTotal) - totals.tPayCash;
-      const finalTransfer = (state.startTransfer + totals.recvTotal) - totals.tPayTransfer;
+      // ใช้สูตรเดียวกับ Display เสมอ
+      const { finalCash, finalTransfer } = computeFinalsByMethod();
 
-    
       const inMinusOut = totals.recvTotal - totals.payTotal;
-      const houseIncome = rake - (dealerAmt -tip + cashierAmt);
       const accountBalance = inMinusOut - houseIncome;
-
 
       const header = ['Name','Received_Transfer','Received_Cash','Received_Total','Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'];
       const lines = [header.join(',')];
@@ -553,7 +556,10 @@
       lines.push(['START_CASH', state.startCash, '', '', '', '', '', ''].join(','));
       lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
       lines.push(['RAKE_TOTAL', rake, '', '', '', '', '', ''].join(','));
+      lines.push(['DEALER_PAYOUT', dealerAmt, '', '', '', '', '', ''].join(','));
+      lines.push(['CASHIER_PAYOUT', cashierAmt, '', '', '', '', '', ''].join(','));
       lines.push(['HOUSE_IN', houseIncome, '', '', '', '', '', ''].join(','));
+      lines.push(['ACCOUNT_STATUS_DIFF', accountBalance, '', '', '', '', '', ''].join(','));
       lines.push(['FINAL_CASH', finalCash, '', '', '', '', '', ''].join(','));
       lines.push(['FINAL_TRANSFER', finalTransfer, '', '', '', '', '', ''].join(','));
 
