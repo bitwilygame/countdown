@@ -53,6 +53,10 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">เงินบัญชีเริ่มแรก</label>
           <input id="startTransferInput" type="number" step="0.01" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="0.00" />
         </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">โบนัส</label>
+          <input id="bonusInput" type="number" step="0.01" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="0.00" />
+        </div>
       </div>
       <div class="flex justify-end gap-3 mt-6">
         <button id="startSaveBtn" class="success-button px-5 py-3 rounded-xl text-white font-medium">บันทึก & เริ่มใช้งาน</button>
@@ -261,7 +265,7 @@
 
     function loadState() {
       const raw = localStorage.getItem(KEY);
-      const defaults = { receive: [], pay: [], rake: 0, tip: 0, startCash: 0, startTransfer: 0, hasStart: false };
+        const defaults = { receive: [], pay: [], rake: 0, tip: 0, startCash: 0, startTransfer: 0, bonus: 0, hasStart: false };
       if (raw) {
         try { return { ...defaults, ...JSON.parse(raw) }; } catch { return defaults; }
       }
@@ -298,15 +302,17 @@
     document.querySelector('[data-tab="receive"]').click();
 
     // ---- Start overlay ----
-    const startOverlay = document.getElementById('startOverlay');
-    const startCashInput = document.getElementById('startCashInput');
-    const startTransferInput = document.getElementById('startTransferInput');
-    const startSaveBtn = document.getElementById('startSaveBtn');
-    const editStartBtn = document.getElementById('editStartBtn');
+      const startOverlay = document.getElementById('startOverlay');
+      const startCashInput = document.getElementById('startCashInput');
+      const startTransferInput = document.getElementById('startTransferInput');
+      const bonusInput = document.getElementById('bonusInput');
+      const startSaveBtn = document.getElementById('startSaveBtn');
+      const editStartBtn = document.getElementById('editStartBtn');
 
     function openStartOverlay() {
-      startCashInput.value = state.startCash || 0;
-      startTransferInput.value = state.startTransfer || 0;
+        startCashInput.value = state.startCash || 0;
+        startTransferInput.value = state.startTransfer || 0;
+        bonusInput.value = state.bonus || 0;
       startOverlay.style.display = 'flex';
     }
     function closeStartOverlay() { startOverlay.style.display = 'none'; }
@@ -314,12 +320,14 @@
     if (!state.hasStart) openStartOverlay();
     editStartBtn.addEventListener('click', openStartOverlay);
 
-    startSaveBtn.addEventListener('click', () => {
-      const sc = parseFloat(startCashInput.value);
-      const st = parseFloat(startTransferInput.value);
-      if (isNaN(sc) || sc < 0 || isNaN(st) || st < 0) return alert('กรอกเงินเริ่มแรกให้ถูกต้อง (≥ 0)');
-      state.startCash = sc; state.startTransfer = st; state.hasStart = true; saveState(); closeStartOverlay(); renderSummary();
-    });
+      startSaveBtn.addEventListener('click', () => {
+        const sc = parseFloat(startCashInput.value);
+        const st = parseFloat(startTransferInput.value);
+        const bn = parseFloat(bonusInput.value);
+        if (isNaN(sc) || sc < 0 || isNaN(st) || st < 0 || isNaN(bn) || bn < 0) return alert('กรอกเงินเริ่มแรกให้ถูกต้อง (≥ 0)');
+        state.startCash = sc; state.startTransfer = st; state.bonus = bn; state.hasStart = true;
+        saveState(); closeStartOverlay(); renderSummary();
+      });
 
     // ---- Checkboxes (single choice) ----
     document.querySelectorAll('.method-recv').forEach(el => el.addEventListener('change', e => onlyOneInGroup('.method-recv', e.target)));
@@ -522,9 +530,9 @@
       dealerLine.textContent  = `dealer : ${dealerAmt.toLocaleString('th-TH')}`;
       cashierLine.textContent = `cashier : ${cashierAmt.toLocaleString('th-TH')}`;
 
-      // สถานะบัญชี: (เข้ารวม - ออกรวม) - เงินเข้าบ้าน
-      const inMinusOut = totals.recvTotal - totals.payTotal;
-      const accountBalance = inMinusOut - houseIncome;
+        // สถานะบัญชี: (เข้ารวม - ออกรวม + โบนัส) - เงินเข้าบ้าน
+        const inMinusOut = totals.recvTotal - totals.payTotal;
+        const accountBalance = (inMinusOut + (state.bonus || 0)) - houseIncome;
       const sign = accountBalance > 0 ? '+' : (accountBalance < 0 ? '−' : '');
       accountStatus.className = 'mt-4 text-center font-semibold ' + (accountBalance === 0 ? 'text-green-700' : 'text-red-700');
       accountStatus.textContent = accountBalance === 0 
@@ -546,15 +554,16 @@
       // ใช้สูตรเดียวกับ Display เสมอ
       const { finalCash, finalTransfer } = computeFinalsByMethod();
 
-      const inMinusOut = totals.recvTotal - totals.payTotal;
-      const accountBalance = inMinusOut - houseIncome;
+        const inMinusOut = totals.recvTotal - totals.payTotal;
+        const accountBalance = (inMinusOut + (state.bonus || 0)) - houseIncome;
 
       const header = ['Name','Received_Transfer','Received_Cash','Received_Total','Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'];
       const lines = [header.join(',')];
       rows.forEach(r=>{ const signVal = r.payTotal - r.recvTotal; lines.push([csvEscape(r.name), r.recvT, r.recvC, r.recvTotal, r.payT, r.payC, r.payTotal, signVal].join(',')); });
       lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
       lines.push(['START_CASH', state.startCash, '', '', '', '', '', ''].join(','));
-      lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
+        lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
+        lines.push(['BONUS', state.bonus, '', '', '', '', '', ''].join(','));
       lines.push(['RAKE_TOTAL', rake, '', '', '', '', '', ''].join(','));
       lines.push(['DEALER_PAYOUT', dealerAmt, '', '', '', '', '', ''].join(','));
       lines.push(['CASHIER_PAYOUT', cashierAmt, '', '', '', '', '', ''].join(','));
@@ -572,7 +581,7 @@
     // ---- Reset ----
     document.getElementById('resetBtn').addEventListener('click', () => {
       if (!confirm('ยืนยันรีเซ็ตข้อมูลทั้งหมด?')) return;
-      state.receive = []; state.pay = []; state.rake = 0; state.tip = 0; state.startCash = 0; state.startTransfer = 0; state.hasStart = false;
+        state.receive = []; state.pay = []; state.rake = 0; state.tip = 0; state.startCash = 0; state.startTransfer = 0; state.bonus = 0; state.hasStart = false;
       saveState(); renderReceive(); renderPay(); refreshNameSelect(); rakeInput.value = ''; tipInput.value = ''; renderSummary();
       localStorage.removeItem(DRAFT_KEY); for (const k in drafts) delete drafts[k];
       document.getElementById('recvName').value = ''; document.getElementById('recvAmount').value = ''; document.getElementById('recvTransfer').checked = false; document.getElementById('recvCash').checked = false;
