@@ -467,11 +467,20 @@
         const recvC = sum(state.receive.filter(r=>r.name===name && r.method==='เงินสด').map(r=>r.amount));
         const payT  = sum(state.pay.filter(r=>r.name===name && r.method==='โอน').map(r=>r.amount));
         const payC  = sum(state.pay.filter(r=>r.name===name && r.method==='เงินสด').map(r=>r.amount));
-        const recvTotal = recvT + recvC; const payTotal = payT + payC; const net = recvTotal - payTotal;
+        const recvTotal = recvT + recvC; const payTotal = payT + payC; const net = payTotal - recvTotal;
         rows.push({ name, recvT, recvC, recvTotal, payT, payC, payTotal, net });
         sRT += recvT; sRC += recvC; sPT += payT; sPC += payC;
       });
-      rows.sort((a,b)=>a.name.localeCompare(b.name,'th'));
+      const fixed = ['Dealer','Cashier'];
+      rows.sort((a,b)=>{
+        const aFixed = fixed.includes(a.name);
+        const bFixed = fixed.includes(b.name);
+        if (aFixed && bFixed) return fixed.indexOf(a.name) - fixed.indexOf(b.name);
+        if (aFixed) return 1;
+        if (bFixed) return -1;
+        const diff = b.net - a.net; // net desc
+        return diff !== 0 ? diff : a.name.localeCompare(b.name,'th');
+      });
       const totals = { recvT: sRT, recvC: sRC, recvTotal: sRT + sRC, payT: sPT, payC: sPC, payTotal: sPT + sPC, net: (sRT + sRC) - (sPT + sPC) };
       return { rows, totals };
     }
@@ -498,7 +507,7 @@
     function renderSummary() {
       const { rows, totals } = buildSummary();
       summaryTbody.innerHTML = rows.map(r => {
-        const signVal = r.payTotal - r.recvTotal; // จ่าย-รับ
+        const signVal = r.net; // จ่าย-รับ
         const label = signVal > 0 ? 'บวก' : (signVal < 0 ? 'ลบ' : 'เท่ากัน');
         const prefix = signVal > 0 ? '+' : (signVal < 0 ? '−' : '');
         const cls = signVal > 0 ? 'text-emerald-700' : (signVal < 0 ? 'text-red-600' : 'text-slate-700');
@@ -559,7 +568,7 @@
 
       const header = ['Name','Received_Transfer','Received_Cash','Received_Total','Paid_Transfer','Paid_Cash','Paid_Total','Net(pay_minus_recv)'];
       const lines = [header.join(',')];
-      rows.forEach(r=>{ const signVal = r.payTotal - r.recvTotal; lines.push([csvEscape(r.name), r.recvT, r.recvC, r.recvTotal, r.payT, r.payC, r.payTotal, signVal].join(',')); });
+      rows.forEach(r=>{ const signVal = r.net; lines.push([csvEscape(r.name), r.recvT, r.recvC, r.recvTotal, r.payT, r.payC, r.payTotal, signVal].join(',')); });
       lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
       lines.push(['START_CASH', state.startCash, '', '', '', '', '', ''].join(','));
         lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
