@@ -53,7 +53,11 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">เงินบัญชีเริ่มแรก</label>
           <input id="startTransferInput" type="number" step="0.01" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="0.00" />
         </div>
-        <div class="sm:col-span-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ชิปเริ่มต้น</label>
+          <input id="startChipInput" type="number" step="1" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="0" />
+        </div>
+        <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">โบนัส</label>
           <input id="bonusInput" type="number" step="0.01" class="glass-input w-full px-4 py-3 rounded-xl" placeholder="0.00" />
         </div>
@@ -265,7 +269,7 @@
 
     function loadState() {
       const raw = localStorage.getItem(KEY);
-        const defaults = { receive: [], pay: [], rake: 0, tip: 0, startCash: 0, startTransfer: 0, bonus: 0, hasStart: false };
+        const defaults = { receive: [], pay: [], rake: 0, tip: 0, startCash: 0, startTransfer: 0, startChip: 0, bonus: 0, hasStart: false };
       if (raw) {
         try { return { ...defaults, ...JSON.parse(raw) }; } catch { return defaults; }
       }
@@ -305,6 +309,7 @@
       const startOverlay = document.getElementById('startOverlay');
       const startCashInput = document.getElementById('startCashInput');
       const startTransferInput = document.getElementById('startTransferInput');
+      const startChipInput = document.getElementById('startChipInput');
       const bonusInput = document.getElementById('bonusInput');
       const startSaveBtn = document.getElementById('startSaveBtn');
       const editStartBtn = document.getElementById('editStartBtn');
@@ -312,6 +317,7 @@
     function openStartOverlay() {
         startCashInput.value = state.startCash || 0;
         startTransferInput.value = state.startTransfer || 0;
+        startChipInput.value = state.startChip || 0;
         bonusInput.value = state.bonus || 0;
       startOverlay.style.display = 'flex';
     }
@@ -323,9 +329,10 @@
       startSaveBtn.addEventListener('click', () => {
         const sc = parseFloat(startCashInput.value);
         const st = parseFloat(startTransferInput.value);
+        const sh = parseFloat(startChipInput.value);
         const bn = parseFloat(bonusInput.value);
-        if (isNaN(sc) || sc < 0 || isNaN(st) || st < 0 || isNaN(bn) || bn < 0) return alert('กรอกเงินเริ่มแรกให้ถูกต้อง (≥ 0)');
-        state.startCash = sc; state.startTransfer = st; state.bonus = bn; state.hasStart = true;
+        if (isNaN(sc) || sc < 0 || isNaN(st) || st < 0 || isNaN(sh) || sh < 0 || isNaN(bn) || bn < 0) return alert('กรอกเงินเริ่มแรกให้ถูกต้อง (≥ 0)');
+        state.startCash = sc; state.startTransfer = st; state.startChip = sh; state.bonus = bn; state.hasStart = true;
         saveState(); closeStartOverlay(); renderSummary();
       });
 
@@ -550,9 +557,11 @@
 
       // เงินสุดท้าย (สูตรเดียวกับ CSV)
       const { finalCash, finalTransfer } = computeFinalsByMethod();
+      const finalChip = (state.startChip || 0) + totals.payTotal - totals.recvTotal;
       finalLines.innerHTML = `
         <div>💵 เงินสดสุดท้าย = <span class="font-bold">${fmt(finalCash)}</span></div>
-        <div>💳 เงินบัญชีสุดท้าย = <span class="font-bold">${fmt(finalTransfer)}</span></div>`;
+        <div>💳 เงินบัญชีสุดท้าย = <span class="font-bold">${fmt(finalTransfer)}</span></div>
+        <div>🎲 ชิปคงเหลือ = <span class="font-bold">${finalChip.toLocaleString('th-TH')}</span></div>`;
     }
 
     document.getElementById('exportCsv').addEventListener('click', () => {
@@ -562,6 +571,7 @@
 
       // ใช้สูตรเดียวกับ Display เสมอ
       const { finalCash, finalTransfer } = computeFinalsByMethod();
+      const finalChip = (state.startChip || 0) + totals.payTotal - totals.recvTotal;
 
         const inMinusOut = totals.recvTotal - totals.payTotal;
         const accountBalance = (inMinusOut + (state.bonus || 0)) - houseIncome;
@@ -571,8 +581,9 @@
       rows.forEach(r=>{ const signVal = r.net; lines.push([csvEscape(r.name), r.recvT, r.recvC, r.recvTotal, r.payT, r.payC, r.payTotal, signVal].join(',')); });
       lines.push(['TOTAL', totals.recvT, totals.recvC, totals.recvTotal, totals.payT, totals.payC, totals.payTotal, ''].join(','));
       lines.push(['START_CASH', state.startCash, '', '', '', '', '', ''].join(','));
-        lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
-        lines.push(['BONUS', state.bonus, '', '', '', '', '', ''].join(','));
+      lines.push(['START_TRANSFER', state.startTransfer, '', '', '', '', '', ''].join(','));
+      lines.push(['START_CHIP', state.startChip, '', '', '', '', '', ''].join(','));
+      lines.push(['BONUS', state.bonus, '', '', '', '', '', ''].join(','));
       lines.push(['RAKE_TOTAL', rake, '', '', '', '', '', ''].join(','));
       lines.push(['DEALER_PAYOUT', dealerAmt, '', '', '', '', '', ''].join(','));
       lines.push(['CASHIER_PAYOUT', cashierAmt, '', '', '', '', '', ''].join(','));
@@ -580,6 +591,7 @@
       lines.push(['ACCOUNT_STATUS_DIFF', accountBalance, '', '', '', '', '', ''].join(','));
       lines.push(['FINAL_CASH', finalCash, '', '', '', '', '', ''].join(','));
       lines.push(['FINAL_TRANSFER', finalTransfer, '', '', '', '', '', ''].join(','));
+      lines.push(['FINAL_CHIP', finalChip, '', '', '', '', '', ''].join(','));
 
       const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -590,7 +602,7 @@
     // ---- Reset ----
     document.getElementById('resetBtn').addEventListener('click', () => {
       if (!confirm('ยืนยันรีเซ็ตข้อมูลทั้งหมด?')) return;
-        state.receive = []; state.pay = []; state.rake = 0; state.tip = 0; state.startCash = 0; state.startTransfer = 0; state.bonus = 0; state.hasStart = false;
+        state.receive = []; state.pay = []; state.rake = 0; state.tip = 0; state.startCash = 0; state.startTransfer = 0; state.startChip = 0; state.bonus = 0; state.hasStart = false;
       saveState(); renderReceive(); renderPay(); refreshNameSelect(); rakeInput.value = ''; tipInput.value = ''; renderSummary();
       localStorage.removeItem(DRAFT_KEY); for (const k in drafts) delete drafts[k];
       document.getElementById('recvName').value = ''; document.getElementById('recvAmount').value = ''; document.getElementById('recvTransfer').checked = false; document.getElementById('recvCash').checked = false;
