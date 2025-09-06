@@ -113,6 +113,34 @@
     let isToken = false;
     let percentages = [50, 30, 20];
 
+    // โหลดข้อมูลจาก LocalStorage
+    window.onload = function() {
+      const savedData = localStorage.getItem("pokerData");
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        buyInValue = data.buyInValue;
+        rakeValue = data.rakeValue;
+        players = data.players;
+        prizePool = data.prizePool;
+        totalRake = data.totalRake;
+        isToken = data.isToken;
+        percentages = data.percentages || percentages;
+
+        isTokenCheck.checked = isToken;
+        setupForm.classList.add("hidden");
+        playerForm.classList.remove("hidden");
+        renderTable();
+        renderPercentages();
+      } else {
+        renderPercentages();
+      }
+    }
+
+    function saveData() {
+      const data = { buyInValue, rakeValue, players, prizePool, totalRake, isToken, percentages };
+      localStorage.setItem("pokerData", JSON.stringify(data));
+    }
+
     function renderPercentages() {
       percentagesDiv.innerHTML = "";
       percentages.forEach((p, i) => {
@@ -126,10 +154,12 @@
           percentages.splice(i, 1);
           renderPercentages();
           calculateRewards();
+          saveData();
         });
         div.querySelector(".percentInput").addEventListener("input", e => {
           percentages[i] = parseFloat(e.target.value) || 0;
           calculateRewards();
+          saveData();
         });
         percentagesDiv.appendChild(div);
       });
@@ -138,6 +168,7 @@
     addPercentageBtn.addEventListener("click", () => {
       percentages.push(0);
       renderPercentages();
+      saveData();
     });
 
     function calculateRewards() {
@@ -149,14 +180,12 @@
       rewardResult.innerHTML = "";
 
       if (!isToken) {
-        // ถ้าไม่ Token ใช้ Prizepool 100%
         rewardResult.innerHTML += `<h2 class='text-lg font-bold mb-2'>🏆 รางวัล (100% ของ Prizepool)</h2>`;
         percentages.forEach((p, i) => {
           const amount = (prizePool * (p / 100)).toFixed(2);
           rewardResult.innerHTML += `<p>${i+1}st: ${p}% = ${amount} ฿</p>`;
         });
       } else {
-        // ถ้า Token แบ่งเป็น 50% Token + 50% แจกอันดับ
         const tokenPool = prizePool * 0.5;
         const rankPool = prizePool * 0.5;
 
@@ -187,6 +216,7 @@
           players.splice(index, 1);
           prizePool -= (buyInValue - rakeValue);
           totalRake -= rakeValue;
+          saveData();
           renderTable();
           calculateRewards();
         });
@@ -195,6 +225,7 @@
       prizePoolCell.textContent = prizePool.toLocaleString();
       totalRakeCell.textContent = totalRake.toLocaleString();
       calculateRewards();
+      saveData();
     }
 
     setupForm.addEventListener("submit", function(e) {
@@ -207,6 +238,7 @@
         setupForm.classList.add("hidden");
         playerForm.classList.remove("hidden");
         renderTable();
+        saveData();
       }
     });
 
@@ -216,12 +248,14 @@
       players.push({ name, paid: false });
       prizePool += (buyInValue - rakeValue);
       totalRake += rakeValue;
+      saveData();
       renderTable();
       playerForm.reset();
     });
 
     resetBtn.addEventListener("click", function() {
       if (confirm("คุณต้องการรีเซตข้อมูลทั้งหมดหรือไม่?")) {
+        localStorage.removeItem("pokerData");
         location.reload();
       }
     });
@@ -252,8 +286,6 @@
       link.setAttribute("download", "poker_data.csv");
       link.click();
     });
-
-    renderPercentages();
   </script>
 </body>
 </html>
