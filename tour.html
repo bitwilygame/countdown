@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Poker Tournament & Prize Distribution</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded-2xl shadow-md">
+    <h1 class="text-2xl font-bold mb-4">📋 Poker Tournament Buy-in & Prize Distribution</h1>
+
+    <!-- ปุ่มจัดการ -->
+    <div class="flex justify-end space-x-2 mb-4">
+      <button id="resetBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">🗑️ รีเซตข้อมูล</button>
+      <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">📂 Export CSV</button>
+    </div>
+
+    <!-- ฟอร์มแรก กำหนด Buy-in และ Rake -->
+    <form id="setupForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium">ราคา Buy-in (฿)</label>
+        <input type="number" id="buyIn" required class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Rake (฿)</label>
+        <input type="number" id="rake" value="0" required class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <div class="flex items-center space-x-2 md:col-span-2">
+        <input type="checkbox" id="isToken" class="w-4 h-4">
+        <label for="isToken" class="text-sm font-medium">Token?</label>
+      </div>
+
+      <div class="md:col-span-2 flex justify-end">
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+          ✅ ยืนยัน Buy-in & Rake
+        </button>
+      </div>
+    </form>
+
+    <!-- ฟอร์มเพิ่มผู้เล่น -->
+    <form id="playerForm" class="grid grid-cols-1 gap-4 mb-6 hidden">
+      <div>
+        <label class="block text-sm font-medium">ชื่อผู้เล่น</label>
+        <input type="text" id="playerName" required class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <div class="flex justify-end">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+          ➕ เพิ่มผู้เล่น
+        </button>
+      </div>
+    </form>
+
+    <!-- ตารางแสดงผล -->
+    <table class="w-full border-collapse mb-6">
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="border px-4 py-2 text-left">ชื่อผู้เล่น</th>
+          <th class="border px-4 py-2 text-right">Buy-in (฿)</th>
+          <th class="border px-4 py-2 text-right">Rake (฿)</th>
+          <th class="border px-4 py-2 text-right">สุทธิ (฿)</th>
+          <th class="border px-4 py-2 text-center">จ่ายแล้ว</th>
+          <th class="border px-4 py-2 text-center">ลบ</th>
+        </tr>
+      </thead>
+      <tbody id="buyinTable"></tbody>
+      <tfoot>
+        <tr class="bg-gray-100 font-bold">
+          <td class="border px-4 py-2 text-right" colspan="5">💰 Prize Pool รวม</td>
+          <td class="border px-4 py-2 text-right" id="prizePool">0</td>
+        </tr>
+        <tr class="bg-gray-100 font-bold">
+          <td class="border px-4 py-2 text-right" colspan="5">🏦 Rake รวม</td>
+          <td class="border px-4 py-2 text-right" id="totalRake">0</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- ฟอร์มคำนวณรางวัล -->
+    <form id="prizeForm" class="space-y-4 hidden">
+      <div>
+        <label class="block mb-1 font-medium">มูลค่ารางวัล (คั่นด้วย ,)</label>
+        <input id="values" type="text" class="w-full p-2 border rounded-lg" placeholder="เช่น 20,40,100,500,1000" required>
+      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+        คำนวณการกระจายรางวัล
+      </button>
+    </form>
+
+    <div id="result" class="mt-6 text-gray-800 font-medium"></div>
+  </div>
+
+  <script>
+    const setupForm = document.getElementById("setupForm");
+    const playerForm = document.getElementById("playerForm");
+    const table = document.getElementById("buyinTable");
+    const prizePoolCell = document.getElementById("prizePool");
+    const totalRakeCell = document.getElementById("totalRake");
+    const resetBtn = document.getElementById("resetBtn");
+    const exportBtn = document.getElementById("exportBtn");
+    const prizeForm = document.getElementById("prizeForm");
+    const isTokenCheck = document.getElementById("isToken");
+
+    let buyInValue = 0;
+    let rakeValue = 0;
+    let prizePool = 0;
+    let totalRake = 0;
+    let players = [];
+    let isToken = false;
+
+    // โหลดข้อมูลจาก LocalStorage
+    window.onload = function() {
+      const savedData = localStorage.getItem("pokerData");
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        buyInValue = data.buyInValue;
+        rakeValue = data.rakeValue;
+        players = data.players;
+        prizePool = data.prizePool;
+        totalRake = data.totalRake;
+        isToken = data.isToken;
+        isTokenCheck.checked = isToken;
+        setupForm.classList.add("hidden");
+        playerForm.classList.remove("hidden");
+        if (isToken) prizeForm.classList.remove("hidden");
+        renderTable();
+      }
+    }
+
+    function saveData() {
+      const data = { buyInValue, rakeValue, players, prizePool, totalRake, isToken };
+      localStorage.setItem("pokerData", JSON.stringify(data));
+    }
+
+    function renderTable() {
+      table.innerHTML = "";
+      players.forEach((p, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td class="border px-4 py-2">${p.name}</td>
+          <td class="border px-4 py-2 text-right">${buyInValue.toLocaleString()}</td>
+          <td class="border px-4 py-2 text-right">${rakeValue.toLocaleString()}</td>
+          <td class="border px-4 py-2 text-right font-semibold">${(buyInValue - rakeValue).toLocaleString()}</td>
+          <td class="border px-4 py-2 text-center"><input type="checkbox" ${p.paid ? "checked" : ""}></td>
+          <td class="border px-4 py-2 text-center"><button class="deleteBtn bg-red-500 text-white px-2 py-1 rounded">ลบ</button></td>
+        `;
+        // ปุ่มลบ
+        row.querySelector(".deleteBtn").addEventListener("click", function() {
+          players.splice(index, 1);
+          prizePool -= (buyInValue - rakeValue);
+          totalRake -= rakeValue;
+          saveData();
+          renderTable();
+        });
+        table.appendChild(row);
+      });
+      prizePoolCell.textContent = prizePool.toLocaleString();
+      totalRakeCell.textContent = totalRake.toLocaleString();
+    }
+
+    setupForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      buyInValue = parseFloat(document.getElementById("buyIn").value);
+      rakeValue = parseFloat(document.getElementById("rake").value);
+      isToken = isTokenCheck.checked;
+
+      if (buyInValue > 0) {
+        setupForm.classList.add("hidden");
+        playerForm.classList.remove("hidden");
+        if (isToken) prizeForm.classList.remove("hidden");
+        saveData();
+      }
+    });
+
+    playerForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      const name = document.getElementById("playerName").value;
+      players.push({ name, paid: false });
+      prizePool += (buyInValue - rakeValue);
+      totalRake += rakeValue;
+      saveData();
+      renderTable();
+      playerForm.reset();
+    });
+
+    resetBtn.addEventListener("click", function() {
+      if (confirm("คุณต้องการรีเซตข้อมูลทั้งหมดหรือไม่?")) {
+        localStorage.removeItem("pokerData");
+        location.reload();
+      }
+    });
+
+    exportBtn.addEventListener("click", function() {
+      let csv = "ชื่อผู้เล่น,Buy-in,Rake,สุทธิ,จ่ายแล้ว\\n";
+      players.forEach(p => {
+        csv += `${p.name},${buyInValue},${rakeValue},${buyInValue - rakeValue},${p.paid ? "Yes" : "No"}\\n`;
+      });
+      csv += `\nPrize Pool รวม,,,,${prizePool}`;
+      csv += `\nRake รวม,,,,${totalRake}`;
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "poker_data.csv");
+      link.click();
+    });
+
+    // ---------------- รางวัล ----------------
+    function getRandomItem(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    prizeForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!isToken) return;
+
+      const total = prizePool * 0.5; // ใช้ 50% ของ Prize pool ถ้าเป็น Token
+      const count = players.length - 1;
+      const values = document.getElementById('values').value.split(',')
+                        .map(v => parseInt(v.trim()))
+                        .filter(v => !isNaN(v));
+
+      let bestDistribution = null;
+      let bestDiff = Infinity;
+
+      for (let trial = 0; trial < 5000; trial++) {
+        let distribution = {};
+        let used = 0;
+        let sum = 0;
+
+        while (used < count) {
+          let prize = getRandomItem(values);
+          distribution[prize] = (distribution[prize] || 0) + 1;
+          sum += prize;
+          used++;
+        }
+
+        let diff = Math.abs(total - sum);
+        if (used === count && diff < bestDiff) {
+          bestDiff = diff;
+          bestDistribution = {distribution, sum, used};
+          if (diff === 0) break;
+        }
+      }
+
+      let resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `<h2 class='text-lg font-bold mb-2'>ผลการกระจายรางวัล Token</h2>`;
+
+      if (!bestDistribution) {
+        resultDiv.innerHTML += `<p class='text-red-600'>ไม่สามารถหาวิธีจัดสรรได้</p>`;
+        return;
+      }
+
+      for (let v of Object.keys(bestDistribution.distribution).sort((a, b) => b - a)) {
+        resultDiv.innerHTML += `<p>${v} บาท จำนวน ${bestDistribution.distribution[v]} รางวัล</p>`;
+      }
+
+      let leftover = total - bestDistribution.sum;
+
+      if (leftover === 0) {
+        resultDiv.innerHTML += `<p class='text-green-600 mt-2'>ลงตัวพอดี ✔️</p>`;
+      } else if (leftover > 0) {
+        resultDiv.innerHTML += `<p class=\"mt-2 text-sm text-gray-600\">รวม: ${bestDistribution.sum} บาท / ${bestDistribution.used} รางวัล<br>ยังเหลือเงิน: ${leftover} บาท</p>`;
+      } else {
+        resultDiv.innerHTML += `<p class=\"mt-2 text-sm text-gray-600\">รวม: ${bestDistribution.sum} บาท / ${bestDistribution.used} รางวัล<br>เกินไป: ${Math.abs(leftover)} บาท</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
