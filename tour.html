@@ -128,23 +128,49 @@
     let isToken = false;
     let percentages = [50, 30, 20];
 
-    // โหลดข้อมูลจาก Memory (แทน LocalStorage เนื่องจากไม่รองรับใน Claude artifacts)
-    let savedData = {
-      buyInValue: 0,
-      rakeValue: 0,
-      players: [],
-      prizePool: 0,
-      totalRake: 0,
-      isToken: false,
-      percentages: [50, 30, 20]
-    };
+    // ใช้ LocalStorage เพื่อเก็บข้อมูลให้คงอยู่เมื่อรีเฟรชหรือเปิดหน้าใหม่
+    const STORAGE_KEY = "tourData";
 
     window.onload = function() {
-      renderPercentages();
+      loadData();
     }
 
     function saveData() {
-      savedData = { buyInValue, rakeValue, players, prizePool, totalRake, isToken, percentages };
+      const data = { buyInValue, rakeValue, players, prizePool, totalRake, isToken, percentages };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.error("ไม่สามารถบันทึกข้อมูลได้", e);
+      }
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          buyInValue = data.buyInValue || 0;
+          rakeValue = data.rakeValue || 0;
+          players = data.players || [];
+          prizePool = data.prizePool || 0;
+          totalRake = data.totalRake || 0;
+          isToken = data.isToken || false;
+          percentages = data.percentages || [50, 30, 20];
+
+          document.getElementById("buyIn").value = buyInValue || "";
+          document.getElementById("rake").value = rakeValue || 0;
+          isTokenCheck.checked = isToken;
+
+          if (buyInValue > 0) {
+            setupForm.classList.add("hidden");
+            playerForm.classList.remove("hidden");
+          }
+        } catch (e) {
+          console.error("ไม่สามารถโหลดข้อมูลที่บันทึกได้", e);
+        }
+      }
+      renderPercentages();
+      renderTable();
     }
 
     function renderPercentages() {
