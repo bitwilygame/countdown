@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shot Clock + Blinds (Display-only & Silent)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100%; }
+    body { font-family: 'Noto Sans', sans-serif; }
+    /* Display-only: disable text selection everywhere */
+    * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .slide-in { transition: transform .25s ease; }
+    .hidden-sidebar { transform: translateX(-100%); }
+    .visible-sidebar { transform: translateX(0); }
+  </style>
+  <script>
+    // Ensure toggleSidebar exists before DOM loads
+    window.toggleSidebar = function(){
+      var sidebar = document.getElementById('sidebar');
+      if(!sidebar){
+        document.addEventListener('DOMContentLoaded', function(){
+          var sb = document.getElementById('sidebar');
+          if(!sb) return;
+
+          var isCollapsed = sb.classList.contains('hidden-sidebar');
+          if(isCollapsed){
+            // expand
+            sb.hidden = false;
+            sb.classList.remove('hidden-sidebar');
+            sb.classList.add('visible-sidebar');
+          }else{
+            // collapse
+            sb.classList.remove('visible-sidebar');
+            sb.classList.add('hidden-sidebar');
+            var onEnd = function(ev){
+              if(ev.propertyName !== 'transform') return;
+              sb.hidden = true; // remove from hit-testing/layout
+              sb.removeEventListener('transitionend', onEnd);
+            };
+            sb.addEventListener('transitionend', onEnd);
+          }
+        }, { once: true });
+        return;
+      }
+
+      var isCollapsed = sidebar.classList.contains('hidden-sidebar');
+      if(isCollapsed){
+        // expand: bring back, then slide in
+        sidebar.hidden = false;
+        // force reflow so transition is consistent when coming from hidden
+        sidebar.offsetHeight; // eslint-disable-line no-unused-expressions
+        sidebar.classList.remove('hidden-sidebar');
+        sidebar.classList.add('visible-sidebar');
+      }else{
+        // collapse: slide out, then fully hide
+        sidebar.classList.remove('visible-sidebar');
+        sidebar.classList.add('hidden-sidebar');
+        var onEnd = function(ev){
+          if(ev.propertyName !== 'transform') return;
+          sidebar.hidden = true;
+          sidebar.removeEventListener('transitionend', onEnd);
+        };
+        sidebar.addEventListener('transitionend', onEnd);
+      }
+    };
+  </script>
+</head>
+<body class="h-full bg-[hsl(13,45%,25%)] text-white">
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar"
+      hidden
+      class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-96 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">ตั้งค่า</h2>
+        <button type="button" onclick="toggleSidebar()" class="px-2 py-1 rounded bg-white/10">⟨⟨</button>
+      </div>
+
+      <!-- Shot Clock Settings -->
+      <section class="mb-6">
+        <h3 class="text-lg font-semibold mb-2">Shot Clock</h3>
+        <div class="space-y-2 text-sm">
+          <label class="block">ความยาวต่อรอบ (วินาที)
+            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" oninput="updateShotLength()" />
+          </label>
+        </div>
+      </section>
+
+      <!-- Blind Settings -->
+      <section class="mb-6">
+        <h3 class="text-lg font-semibold mb-2">ระดับ Blind</h3>
+
+        <!-- + / - all durations -->
+        <div class="flex gap-2 mb-3">
+          <button type="button" onclick="adjustAllBlindMinutes(-1)" class="flex-1 bg-white/10 hover:bg-white/15 rounded px-3 py-2 text-sm font-semibold">-1 นาที (ทั้งหมด)</button>
+          <button type="button" onclick="adjustAllBlindMinutes(1)" class="flex-1 bg-white/10 hover:bg-white/15 rounded px-3 py-2 text-sm font-semibold">+1 นาที (ทั้งหมด)</button>
+        </div>
+
+        <div class="flex gap-4 text-xs text-gray-300 font-semibold mb-1 pl-2">
+          <span class="w-16 text-center">SB</span>
+          <span class="w-16 text-center">BB</span>
+          <span class="w-16 text-center">Min</span>
+        </div>
+        <div id="blindsList" class="space-y-2"></div>
+        <button type="button" onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
+      </section>
+
+      <!-- Timer Controls -->
+      <section class="mb-2">
+        <h3 class="text-lg font-semibold mb-2">Blind Timer</h3>
+        <div class="flex gap-2">
+          <button type="button" onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">Start</button>
+          <button type="button" onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">Pause</button>
+        </div>
+        <button type="button" onclick="resetAll()" class="mt-2 w-full bg-rose-700 rounded px-3 py-2">Reset time</button>
+      </section>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 relative flex flex-col items-center justify-center text-center px-4">
+      <button type="button" onclick="toggleSidebar()" class="absolute top-4 left-4 bg-sky-600 hover:bg-sky-500 px-3 py-1 rounded shadow z-50">☰</button>
+      <button type="button" id="fsBtn" onclick="toggleFullscreen()" class="absolute top-4 right-4 bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded shadow z-50">⛶ Full Screen</button>
+
+      <!-- Shot Clock (ใหญ่) -->
+      <div class="flex flex-col items-center select-none">
+        <div id="shotTime" class="font-extrabold leading-none" style="font-size: clamp(12rem, 50vw, 40rem);">00</div>
+      </div>
+
+      <!-- Divider -->
+      <div class="h-6 md:h-8"></div>
+
+      <!-- Blinds (เล็กกว่า) -->
+      <div class="w-full max-w-screen-xl grid grid-cols-1 md:grid-cols-2 items-stretch gap-1 md:gap-2">
+        <div class="order-2 md:order-1 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col justify-center">
+          <div class="text-sm uppercase tracking-wide text-white/70">Current Blind</div>
+          <div id="currentBlind" class="text-[2rem] sm:text-[2rem] md:text-[4rem] font-semibold break-words">100 / 200</div>
+          <div id="currentLevel" class="mt-1 text-lg text-white/80">Level 1 / 3</div>
+          <div class="mt-2 h-px w-full bg-white/10"></div>
+          <div class="mt-2 text-sm uppercase tracking-wide text-white/70">Next Blind</div>
+
+          <!-- next blind only (button moved to bottom) -->
+          <div id="nextBlind" class="text-[1.5rem] sm:text-[1.75rem] md:text-[2rem]">200 / 400</div>
+        </div>
+        <div class="order-1 md:order-2 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col items-center justify-center">
+          <div class="text-sm uppercase tracking-wide text-white/70">Blind Clock</div>
+          <div id="blindTime" class="mt-1 text-[2.5rem] sm:text-[4rem] md:text-[8rem] text-white/90 leading-none">20:00</div>
+        </div>
+      </div>
+
+      <!-- Next blind button at bottom-most -->
+      <button
+        type="button"
+        id="nextBlindBtn"
+        onclick="nextBlind()"
+        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 shrink-0 bg-emerald-700 rounded px-6 py-3 text-base font-semibold shadow-lg">
+        Next ⟶
+      </button>
+    </main>
+  </div>
+
+  <script>
+    let blinds = JSON.parse(localStorage.getItem('blinds')) || [
+      { sb: 100, bb: 200, duration: 20 },
+      { sb: 200, bb: 400, duration: 20 },
+      { sb: 300, bb: 600, duration: 20 }
+    ];
+    let currentBlindIndex = parseInt(localStorage.getItem('currentBlindIndex') || '0');
+    let blindTimer = (blinds[currentBlindIndex]?.duration || 20) * 60;
+    let blindInterval = null;
+    let blindPaused = false;
+
+    let shotLen = parseInt(localStorage.getItem('shotLen') || '30');
+    let shotEnd = 0;
+    let rafId = null;
+    let lastShown = -1;
+    let lastHue = -1; // Cache last hue value
+
+    // Shot Clock pause state
+    let shotPaused = false;
+    let shotRemainingMs = 0;
+
+    // Debounce save
+    let saveTimeout = null;
+    const SAVE_DELAY = 1000; // Save at most once per second
+
+    // Cache DOM elements once
+    const elShot = document.getElementById('shotTime');
+    const elBlind = document.getElementById('blindTime');
+    const elCur = document.getElementById('currentBlind');
+    const elNext = document.getElementById('nextBlind');
+    const elNextBtn = document.getElementById('nextBlindBtn');
+    const elLevel = document.getElementById('currentLevel');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const inputShotLen = document.getElementById('shotLen');
+    const blindsList = document.getElementById('blindsList');
+    
+    inputShotLen.value = shotLen;
+
+    window.addBlind = function(){
+      blinds.push({ sb: 0, bb: 0, duration: 20 });
+      save();
+      renderBlinds();
+      renderDisplay();
+    };
+
+    window.deleteBlind = function(i){
+      blinds.splice(i,1);
+      currentBlindIndex = Math.max(0, Math.min(currentBlindIndex, blinds.length-1));
+      save();
+      renderBlinds();
+      renderDisplay();
+    };
+
+    window.moveBlind = function(i, dir){
+      const j = i + dir;
+      if (j < 0 || j >= blinds.length) return;
+      const [item] = blinds.splice(i,1);
+      blinds.splice(j,0,item);
+      if (currentBlindIndex === i) currentBlindIndex = j;
+      else if (currentBlindIndex === j) currentBlindIndex = i;
+      save();
+      renderBlinds();
+      renderDisplay();
+    };
+
+    window.updateBlind = function(i, key, val){
+      blinds[i][key] = parseInt(val)||0;
+      if(key==='duration' && i===currentBlindIndex){
+        blindTimer = blinds[i].duration*60;
+        renderBlindTime();
+      }
+      save();
+      renderDisplay();
+    };
+
+    function renderBlinds(){
+      // Use DocumentFragment for better performance
+      const fragment = document.createDocumentFragment();
+      
+      blinds.forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 bg-gray-700/30 p-2 rounded';
+        
+        // Create inputs
+        const sbInput = createInput(b.sb, i, 'sb');
+        const bbInput = createInput(b.bb, i, 'bb');
+        const durInput = createInput(b.duration, i, 'duration');
+        
+        // Create button container
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'ml-auto flex items-center gap-1';
+        
+        const upBtn = createButton('▲', () => moveBlind(i, -1), 'px-2 text-white/80 bg-white/10 rounded');
+        const downBtn = createButton('▼', () => moveBlind(i, 1), 'px-2 text-white/80 bg-white/10 rounded');
+        const delBtn = createButton('✖', () => deleteBlind(i), 'px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold');
+        
+        btnContainer.append(upBtn, downBtn, delBtn);
+        div.append(sbInput, bbInput, durInput, btnContainer);
+        fragment.appendChild(div);
+      });
+      
+      blindsList.innerHTML = '';
+      blindsList.appendChild(fragment);
+    }
+    
+    function createInput(value, index, key) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = value;
+      input.className = 'w-16 bg-gray-700 rounded px-2 py-1';
+      input.addEventListener('input', () => updateBlind(index, key, input.value));
+      return input;
+    }
+    
+    function createButton(text, handler, className) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = text;
+      btn.className = className;
+      btn.addEventListener('click', handler);
+      return btn;
+    }
+
+    // Cache last blind time string to avoid unnecessary updates
+    let lastBlindTimeStr = '';
+    
+    function renderBlindTime(){
+      const m = String(Math.floor(blindTimer/60)).padStart(2,'0');
+      const s = String(blindTimer%60).padStart(2,'0');
+      const str = `${m}:${s}`;
+      if (str !== lastBlindTimeStr) {
+        lastBlindTimeStr = str;
+        elBlind.textContent = str;
+      }
+    }
+
+    // Cache display values
+    let lastCurText = '';
+    let lastNextText = '';
+    let lastLevelText = '';
+    
+    function renderDisplay(){
+      const cur = blinds[currentBlindIndex] || {sb:0, bb:0, duration:0};
+      const next = blinds[currentBlindIndex+1];
+      const isBreak = cur.sb===0 && cur.bb===0;
+
+      const curText = isBreak ? 'Break Time' : `${cur.sb} / ${cur.bb}`;
+      if (curText !== lastCurText) {
+        lastCurText = curText;
+        elCur.textContent = curText;
+      }
+
+      let nextText;
+      if(!next) nextText = 'เลเวลสุดท้าย';
+      else {
+        const nextIsBreak = next.sb===0 && next.bb===0;
+        nextText = nextIsBreak ? 'Break Time' : `${next.sb} / ${next.bb}`;
+      }
+      if (nextText !== lastNextText) {
+        lastNextText = nextText;
+        elNext.textContent = nextText;
+      }
+
+      if(elNextBtn){
+        const hasNext = !!next;
+        elNextBtn.disabled = !hasNext;
+        elNextBtn.classList.toggle('opacity-40', !hasNext);
+        elNextBtn.classList.toggle('cursor-not-allowed', !hasNext);
+        elNextBtn.classList.toggle('hover:bg-emerald-600', hasNext);
+      }
+
+      const levelText = `Level ${currentBlindIndex+1} / ${blinds.length}`;
+      if (levelText !== lastLevelText) {
+        lastLevelText = levelText;
+        elLevel.textContent = levelText;
+      }
+      
+      renderBlindTime();
+    }
+
+    // Debounced save function
+    function save(){
+      if (saveTimeout) return; // Already scheduled
+      saveTimeout = setTimeout(() => {
+        localStorage.setItem('blinds', JSON.stringify(blinds));
+        localStorage.setItem('currentBlindIndex', currentBlindIndex);
+        localStorage.setItem('shotLen', shotLen);
+        saveTimeout = null;
+      }, SAVE_DELAY);
+    }
+    
+    // Immediate save for critical operations
+    function saveNow(){
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+      }
+      localStorage.setItem('blinds', JSON.stringify(blinds));
+      localStorage.setItem('currentBlindIndex', currentBlindIndex);
+      localStorage.setItem('shotLen', shotLen);
+    }
+
+    window.startBlindTimer = function(){
+      if(blindInterval) return;
+      blindInterval = setInterval(()=>{
+        if(blindPaused) return;
+        if(blindTimer>0){
+          blindTimer--;
+          renderBlindTime();
+          save(); // Debounced
+        }else{
+          if(currentBlindIndex < blinds.length-1){
+            currentBlindIndex++;
+            blindTimer = (blinds[currentBlindIndex].duration||20)*60;
+            renderDisplay();
+            saveNow(); // Immediate save on level change
+          }else{
+            stopBlindTimer();
+            renderDisplay();
+          }
+        }
+      },1000);
+    };
+
+    function stopBlindTimer(){ clearInterval(blindInterval); blindInterval=null; }
+
+    window.togglePause = function(){
+      blindPaused = !blindPaused;
+      pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
+    };
+
+
+  window.resetAll = function(){
+    stopBlindTimer();
+    blindPaused = false;
+    pauseBtn.textContent = '⸷ Pause';
+    currentBlindIndex = 0;
+    const cur = blinds[currentBlindIndex] || { duration: 20 };
+    blindTimer = (cur.duration || 20) * 60;
+    renderDisplay();
+    shotPaused = false;
+    shotRemainingMs = 0;
+    shotStop();
+    shotStart();
+    saveNow(); // Immediate save on reset
+    renderBlinds();
+  };
+
+    // Adjust all blind durations (minutes)
+    window.adjustAllBlindMinutes = function(deltaMin){
+      const delta = parseInt(deltaMin, 10) || 0;
+      if(delta === 0 || !blinds.length) return;
+
+      blinds = blinds.map((b)=>({
+        ...b,
+        duration: Math.max(1, (parseInt(b.duration,10)||0) + delta),
+      }));
+
+      // Sync current level timer to new duration (simple & predictable)
+      const cur = blinds[currentBlindIndex];
+      if(cur){
+        blindTimer = (cur.duration || 20) * 60;
+        renderBlindTime();
+      }
+
+      save();
+      renderBlinds();
+      renderDisplay();
+    };
+
+    // Go to next blind immediately
+    window.nextBlind = function(){
+      if(currentBlindIndex >= blinds.length - 1) return;
+      currentBlindIndex++;
+      blindTimer = (blinds[currentBlindIndex]?.duration || 20) * 60;
+      renderDisplay();
+      save();
+    };
+
+    // Optimized shot clock tick
+    function shotTick(){
+      const now = performance.now();
+      const remaining = Math.max(shotEnd - now, 0);
+      const secs = Math.ceil(remaining/1000);
+
+      if(secs !== lastShown){
+        lastShown = secs;
+        elShot.textContent = secs < 10 ? '0' + secs : String(secs);
+        
+        // Only update background if hue changed
+        const pct = remaining / (shotLen*1000);
+        const hue = Math.round(120 * Math.max(pct, 0));
+        if (hue !== lastHue) {
+          lastHue = hue;
+          document.body.style.backgroundColor = `hsl(${hue}, 45%, 25%)`;
+        }
+      }
+      
+      if(remaining <= 0){
+        rafId = null;
+        return;
+      }
+      rafId = requestAnimationFrame(shotTick);
+    }
+
+    function shotStart(){
+      const v = parseInt(inputShotLen.value||shotLen);
+      if(v>0) { shotLen = v; save(); }
+
+      shotPaused = false;
+      shotRemainingMs = 0;
+      lastHue = -1; // Reset hue cache
+
+      shotEnd = performance.now() + shotLen*1000;
+      lastShown=-1;
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(shotTick);
+    }
+
+    function shotStop(){
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId=null;
+    }
+
+    function shotReset(){
+      if(shotPaused){
+        shotRemainingMs = shotLen * 1000;
+        lastShown = -1;
+        lastHue = -1;
+        elShot.textContent = shotLen < 10 ? '0' + shotLen : String(shotLen);
+        document.body.style.backgroundColor = `hsl(120, 45%, 25%)`;
+        return;
+      }
+      shotEnd = performance.now() + shotLen*1000;
+      lastShown=-1;
+      lastHue = -1;
+      if(!rafId) rafId = requestAnimationFrame(shotTick);
+    }
+
+    function shotPause(){
+      if(shotPaused) return;
+      shotRemainingMs = Math.max(shotEnd - performance.now(), 0);
+      shotPaused = true;
+      shotStop();
+    }
+
+    function shotResume(){
+      if(!shotPaused) return;
+      shotPaused = false;
+      shotEnd = performance.now() + Math.max(shotRemainingMs, 0);
+      shotRemainingMs = 0;
+      lastShown = -1;
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(shotTick);
+    }
+
+    window.updateShotLength = function(){
+      shotLen = parseInt(inputShotLen.value) || shotLen;
+      localStorage.setItem('shotLen', shotLen);
+      shotReset();
+    };
+
+    // click = reset shot clock
+    // double click = pause shot clock
+    // if paused and click = resume shot clock
+    let lastTapAt = 0;
+    let singleTapTimer = null;
+
+    document.body.addEventListener('click', (e)=>{
+      if(e.target.closest('input') || e.target.closest('button') || e.target.closest('#sidebar')) return;
+
+      const now = Date.now();
+      if(now - lastTapAt < 300){
+        // second click => treat as double click
+        if(singleTapTimer) clearTimeout(singleTapTimer);
+        singleTapTimer = null;
+        lastTapAt = 0;
+        shotPause();
+        return;
+      }
+
+      lastTapAt = now;
+      singleTapTimer = setTimeout(()=>{
+        if(shotPaused) shotResume();
+        else shotReset();
+        lastTapAt = 0;
+        singleTapTimer = null;
+      }, 300);
+    });
+
+    // Cleanup legacy key once (we do not store blindTimer explicitly)
+    try { localStorage.removeItem('blindTimer'); } catch(_){ }
+
+    renderBlinds();
+    renderDisplay();
+    shotStart();
+
+    window.toggleFullscreen = function(){
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+      else document.exitFullscreen().catch(()=>{});
+    };
+    document.addEventListener('fullscreenchange', ()=>{
+      const btn = document.getElementById('fsBtn');
+      if(btn) btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
+    });
+  </script>
+</body>
+</html>
