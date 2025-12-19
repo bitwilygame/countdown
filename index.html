@@ -8,7 +8,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     html, body { height: 100%; }
-    body { font-family: 'Noto Sans', sans-serif; }
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      --bg-h: 13;
+      transition: background-color .15s linear;
+    }
     /* Display-only: disable text selection everywhere */
     * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .slide-in { transition: transform .25s ease; }
@@ -23,20 +27,56 @@
         document.addEventListener('DOMContentLoaded', function(){
           var sb = document.getElementById('sidebar');
           if(!sb) return;
-          sb.classList.toggle('visible-sidebar');
-          sb.classList.toggle('hidden-sidebar');
+
+          var isCollapsed = sb.classList.contains('hidden-sidebar');
+          if(isCollapsed){
+            // expand
+            sb.hidden = false;
+            sb.classList.remove('hidden-sidebar');
+            sb.classList.add('visible-sidebar');
+          }else{
+            // collapse
+            sb.classList.remove('visible-sidebar');
+            sb.classList.add('hidden-sidebar');
+            var onEnd = function(ev){
+              if(ev.propertyName !== 'transform') return;
+              sb.hidden = true; // remove from hit-testing/layout
+              sb.removeEventListener('transitionend', onEnd);
+            };
+            sb.addEventListener('transitionend', onEnd);
+          }
         }, { once: true });
         return;
       }
-      sidebar.classList.toggle('visible-sidebar');
-      sidebar.classList.toggle('hidden-sidebar');
+
+      var isCollapsed = sidebar.classList.contains('hidden-sidebar');
+      if(isCollapsed){
+        // expand: bring back, then slide in
+        sidebar.hidden = false;
+        // force reflow so transition is consistent when coming from hidden
+        sidebar.offsetHeight; // eslint-disable-line no-unused-expressions
+        sidebar.classList.remove('hidden-sidebar');
+        sidebar.classList.add('visible-sidebar');
+      }else{
+        // collapse: slide out, then fully hide
+        sidebar.classList.remove('visible-sidebar');
+        sidebar.classList.add('hidden-sidebar');
+        var onEnd = function(ev){
+          if(ev.propertyName !== 'transform') return;
+          sidebar.hidden = true;
+          sidebar.removeEventListener('transitionend', onEnd);
+        };
+        sidebar.addEventListener('transitionend', onEnd);
+      }
     };
   </script>
 </head>
-<body class="h-full bg-[hsl(13,45%,25%)] text-white">
+<body class="h-full bg-[hsl(var(--bg-h),45%,25%)] text-white">
   <div class="flex h-screen">
     <!-- Sidebar -->
-    <aside id="sidebar" class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-96 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
+    <aside id="sidebar"
+      hidden
+      class="slide-in hidden-sidebar fixed inset-y-0 left-0 z-40 w-96 max-w-[85vw] bg-gray-800/95 backdrop-blur p-4 overflow-auto shadow-2xl border-r border-white/10">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold">ตั้งค่า</h2>
         <button type="button" onclick="toggleSidebar()" class="px-2 py-1 rounded bg-white/10">⟨⟨</button>
@@ -47,7 +87,7 @@
         <h3 class="text-lg font-semibold mb-2">Shot Clock</h3>
         <div class="space-y-2 text-sm">
           <label class="block">ความยาวต่อรอบ (วินาที)
-            <input id="shotLen" type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" oninput="updateShotLength()" />
+            <input id="shotLen" data-control type="number" min="5" class="w-full bg-gray-700 rounded px-2 py-1" oninput="updateShotLength()" />
           </label>
         </div>
       </section>
@@ -55,23 +95,46 @@
       <!-- Blind Settings -->
       <section class="mb-6">
         <h3 class="text-lg font-semibold mb-2">ระดับ Blind</h3>
+
+        <!-- + / - all durations -->
+        <div class="flex gap-2 mb-3">
+          <button type="button" data-control onclick="adjustAllBlindMinutes(-1)" class="flex-1 bg-white/10 hover:bg-white/15 rounded px-3 py-2 text-sm font-semibold">-1 นาที (ทั้งหมด)</button>
+          <button type="button" data-control onclick="adjustAllBlindMinutes(1)" class="flex-1 bg-white/10 hover:bg-white/15 rounded px-3 py-2 text-sm font-semibold">+1 นาที (ทั้งหมด)</button>
+        </div>
+
         <div class="flex gap-4 text-xs text-gray-300 font-semibold mb-1 pl-2">
           <span class="w-16 text-center">SB</span>
           <span class="w-16 text-center">BB</span>
           <span class="w-16 text-center">Min</span>
         </div>
         <div id="blindsList" class="space-y-2"></div>
-        <button type="button" onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
+        <button type="button" data-control onclick="addBlind()" class="mt-2 bg-indigo-800 px-4 py-2 rounded w-full">+ เพิ่ม Blind</button>
       </section>
 
       <!-- Timer Controls -->
       <section class="mb-2">
         <h3 class="text-lg font-semibold mb-2">Blind Timer</h3>
         <div class="flex gap-2">
-          <button type="button" onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">Start</button>
-          <button type="button" onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">Pause</button>
+          <button type="button" data-control onclick="startBlindTimer()" class="flex-1 bg-blue-600 rounded px-3 py-2">Start</button>
+          <button type="button" data-control onclick="togglePause()" id="pauseBtn" class="flex-1 bg-yellow-600 rounded px-3 py-2">Pause</button>
         </div>
-        <button type="button" onclick="resetAll()" class="mt-2 w-full bg-rose-700 rounded px-3 py-2">Reset time</button>
+        <button type="button" data-control onclick="resetAll()" class="mt-2 w-full bg-rose-700 rounded px-3 py-2">Reset time</button>
+      </section>
+
+      <!-- Take Control Section -->
+      <section class="mt-6 p-3 rounded-lg bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-500/30">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-white/70">สถานะ</div>
+            <div id="controlStatus" class="font-semibold text-yellow-400">ไม่มีสิทธิ์ควบคุม</div>
+          </div>
+          <button type="button" id="takeControlBtn" onclick="takeControl()" class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-semibold">
+            🎮 Take Control
+          </button>
+        </div>
+        <div id="controllerInfo" class="mt-2 text-xs text-white/50 hidden">
+          ผู้ควบคุม: <span id="controllerName">-</span>
+        </div>
       </section>
     </aside>
 
@@ -96,6 +159,8 @@
           <div id="currentLevel" class="mt-1 text-lg text-white/80">Level 1 / 3</div>
           <div class="mt-2 h-px w-full bg-white/10"></div>
           <div class="mt-2 text-sm uppercase tracking-wide text-white/70">Next Blind</div>
+
+          <!-- next blind only (button moved to bottom) -->
           <div id="nextBlind" class="text-[1.5rem] sm:text-[1.75rem] md:text-[2rem]">200 / 400</div>
         </div>
         <div class="order-1 md:order-2 bg-white/5 rounded-2xl p-4 md:p-6 backdrop-blur border border-white/10 shadow flex flex-col items-center justify-center">
@@ -103,227 +168,673 @@
           <div id="blindTime" class="mt-1 text-[2.5rem] sm:text-[4rem] md:text-[8rem] text-white/90 leading-none">20:00</div>
         </div>
       </div>
+
+      <!-- Next blind button at bottom-most -->
+      <button
+        type="button"
+        id="nextBlindBtn"
+        data-control
+        onclick="nextBlind()"
+        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 shrink-0 bg-emerald-700 rounded px-6 py-3 text-base font-semibold shadow-lg">
+        Next ⟶
+      </button>
     </main>
   </div>
 
-  <script>
-    let blinds = JSON.parse(localStorage.getItem('blinds')) || [
+  <!-- Local Firebase config (static hosting) -->
+  <!-- Create/edit `firebase-config.js` to set window.__FIREBASE_CONFIG__ -->
+  <script src="./firebase-config.js"></script>
+
+  <!-- Replace the entire script below with Firebase RTDB version -->
+  <script type="module">
+    // ===== Firebase Realtime Database Sync (replaces WebSocket) =====
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+    import {
+      getDatabase, ref, onValue, update, set, runTransaction,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      signOut,
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+
+    // TODO: ใส่ค่าจาก Firebase Console → Project settings → Your apps → SDK setup
+    // NOTE: ถ้ามีการ inject config ไว้ที่ window.__FIREBASE_CONFIG__ จะใช้ค่านั้นแทน
+    const firebaseConfig = window.__FIREBASE_CONFIG__ ?? {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "YOUR_PROJECT_ID",
+      appId: "YOUR_APP_ID",
+    };
+
+    const ROOM_ID = 'default';
+    // ทางเลือก C: ใช้บัญชี Email/Password เป็น “ผู้ควบคุม”
+    // - สร้างผู้ใช้ใน Firebase Auth (Email/Password)
+    // - ใส่อีเมลเดียวนี้ไว้เป็น Controller
+    // - รหัสผ่านของบัญชีนี้ = passcode ที่ต้องการแชร์
+    const CONTROL_EMAIL = 'dungeon@poker.com'; // TODO: เปลี่ยนเป็นอีเมลผู้ควบคุมจริง
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
+    const blindsRef = ref(db, `rooms/${ROOM_ID}/state/blinds`);
+    const currentBlindIndexRef = ref(db, `rooms/${ROOM_ID}/state/currentBlindIndex`);
+    const blindRef = ref(db, `rooms/${ROOM_ID}/state/blind`);
+    const shotRef = ref(db, `rooms/${ROOM_ID}/state/shot`);
+
+    let serverTimeOffsetMs = 0;
+    const serverOffsetRef = ref(db, '.info/serverTimeOffset');
+    onValue(serverOffsetRef, (snap) => { serverTimeOffsetMs = snap.val() || 0; });
+    const nowServer = () => Date.now() + serverTimeOffsetMs;
+
+    // ===== Control system (Auth-based) =====
+    // มีสิทธิ์ควบคุม = ล็อกอินด้วยบัญชี CONTROL_EMAIL สำเร็จ
+    let hasControl = false;
+    let authUser = null;
+
+    function canControl() {
+      if (!hasControl) {
+        showNoControlAlert();
+        return false;
+      }
+      return true;
+    }
+
+    function showNoControlAlert() {
+      const status = document.getElementById('controlStatus');
+      status.classList.add('animate-pulse');
+      setTimeout(() => status.classList.remove('animate-pulse'), 1000);
+    }
+
+    function updateControlUI() {
+      const statusEl = document.getElementById('controlStatus');
+      const btnEl = document.getElementById('takeControlBtn');
+      const infoEl = document.getElementById('controllerInfo');
+      const nameEl = document.getElementById('controllerName');
+
+      if (hasControl) {
+        statusEl.textContent = '🟢 คุณกำลังควบคุม';
+        statusEl.className = 'font-semibold text-green-400';
+        btnEl.textContent = '🔓 Release Control';
+        btnEl.className = 'bg-red-600 hover:bg-red-500 px-4 py-2 rounded font-semibold';
+        btnEl.onclick = window.releaseControl;
+        infoEl.classList.add('hidden');
+      } else {
+        statusEl.textContent = '🔒 ต้องใส่ Passcode เพื่อควบคุม';
+        statusEl.className = 'font-semibold text-yellow-400';
+        btnEl.textContent = '🎮 Take Control';
+        btnEl.className = 'bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded font-semibold';
+        btnEl.onclick = window.takeControl;
+        infoEl.classList.remove('hidden');
+        nameEl.textContent = authUser?.email ? authUser.email : '-';
+      }
+
+      const controlButtons = document.querySelectorAll('[data-control]');
+      controlButtons.forEach(btn => {
+        btn.disabled = !hasControl;
+        btn.classList.toggle('opacity-50', !hasControl);
+        btn.classList.toggle('cursor-not-allowed', !hasControl);
+      });
+    }
+
+    // ===== Original Variables (kept) =====
+    const DEFAULT_BLINDS = [
       { sb: 100, bb: 200, duration: 20 },
       { sb: 200, bb: 400, duration: 20 },
       { sb: 300, bb: 600, duration: 20 }
     ];
-    let currentBlindIndex = parseInt(localStorage.getItem('currentBlindIndex') || '0');
-    let blindTimer = (blinds[currentBlindIndex]?.duration || 20) * 60;
-    let blindInterval = null;
-    let blindPaused = false;
 
-    let shotLen = parseInt(localStorage.getItem('shotLen') || '30');
-    let shotEnd = 0;
+    let blinds = DEFAULT_BLINDS.slice();
+    let currentBlindIndex = 0;
+
+    // Blind clock state (derived from RTDB)
+    let blindPaused = true;
+    let blindEndAt = null;        // server ms
+    let blindRemainingSec = 20 * 60;
+    let blindTimer = 20 * 60;
+
+    // Shot clock state (derived from RTDB)
+    let shotLen = 30;
+    let shotPaused = false;
+    let shotEnd = 0;              // server ms
+    let shotRemainingMs = 0;
+
     let rafId = null;
     let lastShown = -1;
+    let lastHue = -1;
 
+    // Cache DOM elements
     const elShot = document.getElementById('shotTime');
     const elBlind = document.getElementById('blindTime');
     const elCur = document.getElementById('currentBlind');
     const elNext = document.getElementById('nextBlind');
+    const elNextBtn = document.getElementById('nextBlindBtn');
     const elLevel = document.getElementById('currentLevel');
     const pauseBtn = document.getElementById('pauseBtn');
     const inputShotLen = document.getElementById('shotLen');
+    const blindsList = document.getElementById('blindsList');
+
     inputShotLen.value = shotLen;
+    elShot.textContent = String(shotLen).padStart(2, '0');
+    updateShotBgFromSeconds(shotLen);
 
-    window.addBlind = function(){
-      blinds.push({ sb: 0, bb: 0, duration: 20 });
-      save();
-      renderBlinds();
-      renderDisplay();
-    };
+    // ===== Helpers: state init =====
+    async function ensureInitialState() {
+      await runTransaction(stateRef, (cur) => {
+        if (cur) return cur;
 
-    window.deleteBlind = function(i){
-      blinds.splice(i,1);
-      currentBlindIndex = Math.max(0, Math.min(currentBlindIndex, blinds.length-1));
-      save();
-      renderBlinds();
-      renderDisplay();
-    };
-
-    window.moveBlind = function(i, dir){
-      const j = i + dir;
-      if (j < 0 || j >= blinds.length) return;
-      const [item] = blinds.splice(i,1);
-      blinds.splice(j,0,item);
-      if (currentBlindIndex === i) currentBlindIndex = j;
-      else if (currentBlindIndex === j) currentBlindIndex = i;
-      save();
-      renderBlinds();
-      renderDisplay();
-    };
-
-    window.updateBlind = function(i, key, val){
-      blinds[i][key] = parseInt(val)||0;
-      if(key==='duration' && i===currentBlindIndex){
-        blindTimer = blinds[i].duration*60;
-        renderBlindTime();
-      }
-      save();
-      renderDisplay();
-    };
-
-    function renderBlinds(){
-      const list = document.getElementById('blindsList');
-      list.innerHTML = '';
-      blinds.forEach((b,i)=>{
-        list.innerHTML += `
-          <div class="flex items-center gap-2 bg-gray-700/30 p-2 rounded">
-            <input type="number" value="${b.sb}" oninput="updateBlind(${i},'sb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            <input type="number" value="${b.bb}" oninput="updateBlind(${i},'bb',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            <input type="number" value="${b.duration}" oninput="updateBlind(${i},'duration',this.value)" class="w-16 bg-gray-700 rounded px-2 py-1">
-            <div class="ml-auto flex items-center gap-1">
-              <button type="button" onclick="moveBlind(${i}, -1)" class="px-2 text-white/80 bg-white/10 rounded">▲</button>
-              <button type="button" onclick="moveBlind(${i}, 1)" class="px-2 text-white/80 bg-white/10 rounded">▼</button>
-              <button type="button" onclick="deleteBlind(${i})" class="px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold">✖</button>
-            </div>
-          </div>`;
+        const duration0 = (DEFAULT_BLINDS[0]?.duration || 20) * 60;
+        const now = Date.now();
+        return {
+          blinds: DEFAULT_BLINDS,
+          currentBlindIndex: 0,
+          controller: { id: null, since: null },
+          blind: { paused: true, endAt: null, remainingSec: duration0 },
+          shot: { len: shotLen, paused: false, endAt: now + shotLen * 1000, remainingMs: 0 },
+          updatedAt: serverTimestamp(),
+        };
       });
     }
 
-    function renderDisplay(){
-      const cur = blinds[currentBlindIndex] || {sb:0, bb:0, duration:0};
-      const next = blinds[currentBlindIndex+1];
-      const isBreak = cur.sb===0 && cur.bb===0;
-      elCur.textContent = isBreak ? 'Break Time' : `${cur.sb} / ${cur.bb}`;
-      elNext.textContent = next? `${next.sb} / ${next.bb}` : 'เลเวลสุดท้าย';
-      elLevel.textContent = `Level ${currentBlindIndex+1} / ${blinds.length}`;
+    // ===== Auth listener (Email/Password controller) =====
+    onAuthStateChanged(auth, async (user) => {
+      authUser = user;
+      hasControl = !!user && (user.email === CONTROL_EMAIL);
+      updateControlUI();
+
+      // สร้าง state เริ่มต้น “เฉพาะ” ตอนที่เป็นผู้ควบคุมเท่านั้น
+      // (เพราะ RTDB Rules จะกันการเขียนจากผู้ชม)
+      if (hasControl) {
+        try {
+          await ensureInitialState();
+        } catch (e) {
+          // ถ้า rules/config ผิด จะตกที่นี่
+          console.warn('ensureInitialState failed:', e);
+        }
+      }
+    });
+
+    onValue(blindsRef, (snap) => {
+      const v = snap.val();
+      if (Array.isArray(v)) blinds = v;
+      renderBlinds();
+      renderDisplay();
+    });
+
+    onValue(currentBlindIndexRef, (snap) => {
+      const v = snap.val();
+      if (Number.isFinite(v)) currentBlindIndex = v;
+      renderDisplay();
+    });
+
+    onValue(blindRef, (snap) => {
+      const b = snap.val() || {};
+      blindPaused = !!b.paused;
+      blindEndAt = b.endAt ?? null;
+      blindRemainingSec = Number.isFinite(b.remainingSec) ? b.remainingSec : blindRemainingSec;
+
+      pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
+      renderDisplay();
+    });
+
+    onValue(shotRef, (snap) => {
+      const s = snap.val() || {};
+
+      shotLen = Number.isFinite(s.len) ? s.len : shotLen;
+      inputShotLen.value = shotLen;
+
+      shotPaused = !!s.paused;
+      if (shotPaused) {
+        shotRemainingMs = Number.isFinite(s.remainingMs) ? s.remainingMs : 0;
+        shotStop();
+        const secs = Math.ceil(shotRemainingMs / 1000);
+        elShot.textContent = String(secs).padStart(2, '0');
+        updateShotBgFromSeconds(secs);
+        return;
+      }
+
+      shotRemainingMs = 0;
+      shotEnd = Number.isFinite(s.endAt) ? s.endAt : shotEnd;
+      lastShown = -1;
+      if (!rafId) rafId = requestAnimationFrame(shotTick);
+    });
+
+    // Local render loop for blind time (no "tick writes" to DB)
+    setInterval(() => {
+      const sec = calcBlindRemainingSec();
+      if (sec !== blindTimer) {
+        blindTimer = sec;
+        renderBlindTime();
+      }
+    }, 250);
+
+    function calcBlindRemainingSec() {
+      if (blindPaused) return Math.max(0, Math.ceil(blindRemainingSec));
+      if (!Number.isFinite(blindEndAt)) return 0;
+      return Math.max(0, Math.ceil((blindEndAt - nowServer()) / 1000));
+    }
+
+    // ===== UI actions -> RTDB writes =====
+    window.takeControl = async function () {
+      const passcode = window.prompt('ใส่ Passcode');
+      if (!passcode) return;
+
+      try {
+        await signInWithEmailAndPassword(auth, CONTROL_EMAIL, passcode);
+      } catch (e) {
+        console.warn('signIn failed:', e);
+        alert('Passcode ไม่ถูกต้อง หรือยังไม่ได้เปิด Email/Password ใน Firebase Auth');
+      }
+    };
+
+    window.releaseControl = async function () {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.warn('signOut failed:', e);
+      }
+    };
+
+    window.addBlind = async function () {
+      if (!canControl()) return;
+      const next = [...blinds, { sb: 0, bb: 0, duration: 20 }];
+      await set(blindsRef, next);
+    };
+
+    window.deleteBlind = async function (i) {
+      if (!canControl()) return;
+      const next = blinds.slice();
+      next.splice(i, 1);
+      const newIndex = Math.max(0, Math.min(currentBlindIndex, next.length - 1));
+      await Promise.all([
+        set(blindsRef, next),
+        set(currentBlindIndexRef, newIndex),
+      ]);
+    };
+
+    window.moveBlind = async function (i, dir) {
+      if (!canControl()) return;
+      const j = i + dir;
+      if (j < 0 || j >= blinds.length) return;
+
+      const next = blinds.slice();
+      const [item] = next.splice(i, 1);
+      next.splice(j, 0, item);
+
+      let newIndex = currentBlindIndex;
+      if (newIndex === i) newIndex = j;
+      else if (newIndex === j) newIndex = i;
+
+      await Promise.all([
+        set(blindsRef, next),
+        set(currentBlindIndexRef, newIndex),
+      ]);
+    };
+
+    window.updateBlind = async function (i, key, val) {
+      if (!canControl()) return;
+      const n = parseInt(val, 10) || 0;
+      await update(ref(db, `rooms/${ROOM_ID}/state/blinds/${i}`), { [key]: n });
+    };
+
+    window.adjustAllBlindMinutes = async function (deltaMin) {
+      if (!canControl()) return;
+      const delta = parseInt(deltaMin, 10) || 0;
+      if (!delta) return;
+
+      await runTransaction(stateRef, (cur) => {
+        if (!cur?.blinds?.length) return cur;
+
+        const deltaSec = delta * 60;
+        const nextBlinds = cur.blinds.map((b) => ({
+          ...b,
+          duration: Math.max(1, (parseInt(b.duration, 10) || 0) + delta),
+        }));
+
+        const blind = cur.blind || { paused: true, endAt: null, remainingSec: 0 };
+
+        if (blind.paused) {
+          blind.remainingSec = Math.max(0, (parseInt(blind.remainingSec, 10) || 0) + deltaSec);
+        } else if (Number.isFinite(blind.endAt)) {
+          blind.endAt = blind.endAt + deltaSec * 1000;
+        }
+
+        // ลด write: ไม่อัปเดต updatedAt ทุกครั้ง
+        return { ...cur, blinds: nextBlinds, blind };
+      });
+    };
+
+    window.startBlindTimer = async function () {
+      if (!canControl()) return;
+
+      await runTransaction(stateRef, (cur) => {
+        if (!cur) return cur;
+        const blind = cur.blind || { paused: true, endAt: null, remainingSec: 0 };
+        if (!blind.paused) return cur;
+
+        const idx = Number.isFinite(cur.currentBlindIndex) ? cur.currentBlindIndex : 0;
+        const durationSec = ((cur.blinds?.[idx]?.duration ?? 20) * 60);
+        const remainingSec = Number.isFinite(blind.remainingSec) && blind.remainingSec > 0 ? blind.remainingSec : durationSec;
+
+        return {
+          ...cur,
+          blind: {
+            paused: false,
+            remainingSec,
+            endAt: nowServer() + remainingSec * 1000,
+          },
+        };
+      });
+    };
+
+    window.togglePause = async function () {
+      if (!canControl()) return;
+
+      await runTransaction(stateRef, (cur) => {
+        if (!cur) return cur;
+        const blind = cur.blind || { paused: true, endAt: null, remainingSec: 0 };
+
+        if (blind.paused) {
+          const remainingSec = Number.isFinite(blind.remainingSec) ? blind.remainingSec : 0;
+          return {
+            ...cur,
+            blind: { paused: false, remainingSec, endAt: nowServer() + remainingSec * 1000 },
+          };
+        }
+
+        const remainingSec = Number.isFinite(blind.endAt)
+          ? Math.max(0, Math.ceil((blind.endAt - nowServer()) / 1000))
+          : 0;
+
+        return {
+          ...cur,
+          blind: { paused: true, endAt: null, remainingSec },
+        };
+      });
+    };
+
+    window.nextBlind = async function () {
+      if (!canControl()) return;
+
+      await runTransaction(stateRef, (cur) => {
+        if (!cur?.blinds?.length) return cur;
+        const idx = Number.isFinite(cur.currentBlindIndex) ? cur.currentBlindIndex : 0;
+        const nextIdx = idx + 1;
+        if (nextIdx >= cur.blinds.length) return cur;
+
+        const durationSec = (cur.blinds[nextIdx]?.duration ?? 20) * 60;
+        const blind = cur.blind || { paused: true, endAt: null, remainingSec: durationSec };
+
+        const nextBlindState = blind.paused
+          ? { paused: true, endAt: null, remainingSec: durationSec }
+          : { paused: false, remainingSec: durationSec, endAt: nowServer() + durationSec * 1000 };
+
+        return { ...cur, currentBlindIndex: nextIdx, blind: nextBlindState };
+      });
+    };
+
+    window.resetAll = async function () {
+      if (!canControl()) return;
+
+      await runTransaction(stateRef, (cur) => {
+        if (!cur?.blinds?.length) return cur;
+
+        const durationSec = (cur.blinds[0]?.duration ?? 20) * 60;
+        const shotLen2 = Number.isFinite(cur.shot?.len) ? cur.shot.len : 30;
+
+        return {
+          ...cur,
+          currentBlindIndex: 0,
+          blind: { paused: true, endAt: null, remainingSec: durationSec },
+          shot: { len: shotLen2, paused: false, remainingMs: 0, endAt: nowServer() + shotLen2 * 1000 },
+        };
+      });
+    };
+
+    window.updateShotLength = async function () {
+      if (!canControl()) return;
+      const newLen = parseInt(inputShotLen.value, 10) || 30;
+
+      await runTransaction(shotRef, (shot) => {
+        const cur = shot || { len: 30, paused: false, endAt: null, remainingMs: 0 };
+
+        if (cur.paused) {
+          return { ...cur, len: newLen, remainingMs: newLen * 1000 };
+        }
+
+        return { ...cur, len: newLen, endAt: nowServer() + newLen * 1000, remainingMs: 0 };
+      });
+    };
+
+    async function shotReset() {
+      if (!canControl()) return;
+      await runTransaction(shotRef, (shot) => {
+        const len = Number.isFinite(shot?.len) ? shot.len : 30;
+        return { len, paused: false, remainingMs: 0, endAt: nowServer() + len * 1000 };
+      });
+    }
+
+    async function shotPauseCmd() {
+      if (!canControl()) return;
+      await runTransaction(shotRef, (shot) => {
+        const cur = shot || { len: 30, paused: false, endAt: null, remainingMs: 0 };
+        if (cur.paused) return cur;
+
+        const remainingMs = Number.isFinite(cur.endAt)
+          ? Math.max(0, cur.endAt - nowServer())
+          : 0;
+
+        return { ...cur, paused: true, endAt: null, remainingMs };
+      });
+    }
+
+    async function shotResume() {
+      if (!canControl()) return;
+      await runTransaction(shotRef, (shot) => {
+        const cur = shot || { len: 30, paused: true, endAt: null, remainingMs: 0 };
+        if (!cur.paused) return cur;
+
+        const remainingMs = Number.isFinite(cur.remainingMs) ? cur.remainingMs : 0;
+        return { ...cur, paused: false, remainingMs: 0, endAt: nowServer() + remainingMs };
+      });
+    }
+
+    // expose for onclick/tap logic
+    window.shotReset = shotReset;
+    window.shotPause = shotPauseCmd;
+    window.shotResume = shotResume;
+
+    // ===== renderBlinds =====
+    const blindInputTimers = new Map();
+    function scheduleUpdateBlind(i, key, val) {
+      const k = `${i}:${key}`;
+      const prev = blindInputTimers.get(k);
+      if (prev) clearTimeout(prev);
+      blindInputTimers.set(k, setTimeout(() => window.updateBlind(i, key, val), 200));
+    }
+
+    function renderBlinds() {
+      const fragment = document.createDocumentFragment();
+
+      blinds.forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 bg-gray-700/30 p-2 rounded';
+
+        const sbInput = createInput(b.sb, i, 'sb');
+        const bbInput = createInput(b.bb, i, 'bb');
+        const durInput = createInput(b.duration, i, 'duration');
+
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'ml-auto flex items-center gap-1';
+
+        const upBtn = createButton('▲', () => moveBlind(i, -1), 'px-2 text-white/80 bg-white/10 rounded');
+        const downBtn = createButton('▼', () => moveBlind(i, 1), 'px-2 text-white/80 bg-white/10 rounded');
+        const delBtn = createButton('✖', () => deleteBlind(i), 'px-3 py-1 text-white bg-red-600 hover:bg-red-700 rounded text-lg font-bold');
+
+        btnContainer.append(upBtn, downBtn, delBtn);
+        div.append(sbInput, bbInput, durInput, btnContainer);
+        fragment.appendChild(div);
+      });
+
+      blindsList.innerHTML = '';
+      blindsList.appendChild(fragment);
+    }
+
+    function createInput(value, index, key) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = value;
+      input.dataset.control = '1';
+      input.className = 'w-16 bg-gray-700 rounded px-2 py-1';
+
+      input.addEventListener('input', () => scheduleUpdateBlind(index, key, input.value));
+      input.addEventListener('blur', () => window.updateBlind(index, key, input.value));
+
+      return input;
+    }
+
+    function createButton(text, handler, className) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = text;
+      btn.dataset.control = '1';
+      btn.className = className;
+      btn.addEventListener('click', handler);
+      return btn;
+    }
+
+    // Cache last blind time string to avoid unnecessary updates
+    let lastBlindTimeStr = '';
+    function renderBlindTime() {
+      const m = String(Math.floor(blindTimer / 60)).padStart(2, '0');
+      const s = String(blindTimer % 60).padStart(2, '0');
+      const str = `${m}:${s}`;
+      if (str !== lastBlindTimeStr) {
+        lastBlindTimeStr = str;
+        elBlind.textContent = str;
+      }
+    }
+
+    // Cache display values
+    let lastCurText = '';
+    let lastNextText = '';
+    let lastLevelText = '';
+    function renderDisplay() {
+      const cur = blinds[currentBlindIndex] || { sb: 0, bb: 0, duration: 0 };
+      const next = blinds[currentBlindIndex + 1];
+      const isBreak = cur.sb === 0 && cur.bb === 0;
+
+      const curText = isBreak ? 'Break Time' : `${cur.sb} / ${cur.bb}`;
+      if (curText !== lastCurText) {
+        lastCurText = curText;
+        elCur.textContent = curText;
+      }
+
+      let nextText;
+      if (!next) nextText = 'เลเวลสุดท้าย';
+      else {
+        const nextIsBreak = next.sb === 0 && next.bb === 0;
+        nextText = nextIsBreak ? 'Break Time' : `${next.sb} / ${next.bb}`;
+      }
+      if (nextText !== lastNextText) {
+        lastNextText = nextText;
+        elNext.textContent = nextText;
+      }
+
+      if (elNextBtn) {
+        const hasNext = !!next;
+        elNextBtn.disabled = !hasNext;
+        elNextBtn.classList.toggle('opacity-40', !hasNext);
+        elNextBtn.classList.toggle('cursor-not-allowed', !hasNext);
+        elNextBtn.classList.toggle('hover:bg-emerald-600', hasNext);
+      }
+
+      const levelText = `Level ${currentBlindIndex + 1} / ${blinds.length}`;
+      if (levelText !== lastLevelText) {
+        lastLevelText = levelText;
+        elLevel.textContent = levelText;
+      }
+
+      blindTimer = calcBlindRemainingSec();
       renderBlindTime();
     }
 
-    function renderBlindTime(){
-      const m = String(Math.floor(blindTimer/60)).padStart(2,'0');
-      const s = String(blindTimer%60).padStart(2,'0');
-      elBlind.textContent = `${m}:${s}`;
+    function shotStop() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
     }
 
-    window.startBlindTimer = function(){
-      if(blindInterval) return;
-      blindInterval = setInterval(()=>{
-        if(blindPaused) return;
-        if(blindTimer>0){
-          blindTimer--;
-          renderBlindTime();
-          save();
-        }else{
-          if(currentBlindIndex < blinds.length-1){
-            currentBlindIndex++;
-            blindTimer = (blinds[currentBlindIndex].duration||20)*60;
-            renderDisplay();
-            save();
-          }else{
-            stopBlindTimer();
-            renderDisplay();
-          }
-        }
-      },1000);
-    };
-
-    function stopBlindTimer(){ clearInterval(blindInterval); blindInterval=null; }
-
-    window.togglePause = function(){
-      blindPaused = !blindPaused;
-      pauseBtn.textContent = blindPaused ? '▶ Resume' : '⸷ Pause';
-    };
-
-
-  window.resetAll = function(){
-    // หยุดตัวจับเวลา Blind และเคลียร์สถานะหยุดชั่วคราว
-    stopBlindTimer();
-    blindPaused = false;
-    pauseBtn.textContent = '⸷ Pause';
-
-    // ⬇️ รีเซ็ตกลับไปที่เลเวล 1 (index = 0)
-    currentBlindIndex = 0;
-
-    // ตั้งเวลา Blind ของเลเวลแรก
-    const cur = blinds[currentBlindIndex] || { duration: 20 };
-    blindTimer = (cur.duration || 20) * 60;
-
-    // อัปเดตหน้าจอให้สอดคล้องกับเลเวลใหม่
-    renderDisplay();
-
-    // รีสตาร์ท Shot Clock ตามความยาวที่ตั้งไว้
-    shotStop();
-    shotStart();
-
-    // บันทึกสถานะล่าสุด (รวม currentBlindIndex = 0)
-    save();
-
-    // (ไม่จำเป็นมาก แต่ช่วยให้ sidebar sync ทันที)
-    renderBlinds();
-  };
-
-    function save(){
-      localStorage.setItem('blinds', JSON.stringify(blinds));
-      localStorage.setItem('currentBlindIndex', currentBlindIndex);
-      localStorage.setItem('shotLen', shotLen);
-    }
-
-    function shotTick(){
-      const now = performance.now();
-      const remaining = Math.max(shotEnd - now, 0);
-      const secs = Math.ceil(remaining/1000);
-      if(secs !== lastShown){
-        lastShown = secs;
-        elShot.textContent = String(Math.max(secs,0)).padStart(2,'0');
-        const pct = Math.max(remaining / (shotLen*1000), 0);
-        const hue = Math.round(120*pct);
-        document.body.style.backgroundColor = `hsl(${hue}, 45%, 25%)`;
+    function updateShotBgFromSeconds(secsLeft) {
+      const total = Math.max(1, parseInt(shotLen, 10) || 30);
+      const clamped = Math.max(0, Math.min(total, secsLeft));
+      const ratio = clamped / total;
+      const hue = Math.round(ratio * 120);
+      if (hue !== lastHue) {
+        lastHue = hue;
+        document.body.style.setProperty('--bg-h', String(hue));
       }
-      if(remaining<=0){
-        cancelAnimationFrame(rafId); rafId=null; return;
+    }
+
+    function shotTick() {
+      rafId = requestAnimationFrame(shotTick);
+      if (shotPaused) return;
+
+      const msLeft = shotEnd - nowServer();
+      const secsLeft = Math.max(0, Math.ceil(msLeft / 1000));
+
+      if (secsLeft !== lastShown) {
+        lastShown = secsLeft;
+        elShot.textContent = String(secsLeft).padStart(2, '0');
+        updateShotBgFromSeconds(secsLeft);
       }
-      rafId = requestAnimationFrame(shotTick);
+
+      if (msLeft <= 0) {
+        shotStop();
+      }
     }
 
-    function shotStart(){
-      const v = parseInt(inputShotLen.value||shotLen);
-      if(v>0) { shotLen = v; save(); }
-      shotEnd = performance.now() + shotLen*1000;
-      lastShown=-1;
-      if(rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(shotTick);
-    }
+    // Click handlers for shot clock (kept)
+    let lastTapAt = 0;
+    let singleTapTimer = null;
 
-    function shotStop(){ if(rafId) cancelAnimationFrame(rafId); rafId=null; }
+    document.body.addEventListener('click', (e) => {
+      if (e.target.closest('input') || e.target.closest('button') || e.target.closest('#sidebar')) return;
 
-    function shotReset(){
-      shotEnd = performance.now() + shotLen*1000;
-      lastShown=-1;
-      if(!rafId) rafId = requestAnimationFrame(shotTick);
-    }
+      const now = Date.now();
+      if (now - lastTapAt < 300) {
+        if (singleTapTimer) clearTimeout(singleTapTimer);
+        singleTapTimer = null;
+        lastTapAt = 0;
+        shotPauseCmd();
+        return;
+      }
 
-    window.updateShotLength = function(){
-      shotLen = parseInt(inputShotLen.value) || shotLen;
-      localStorage.setItem('shotLen', shotLen);
-      shotReset();
-    };
-
-    document.body.addEventListener('click', (e)=>{
-      if(e.target.closest('input') || e.target.closest('button') || e.target.closest('#sidebar')) return;
-      shotReset();
+      lastTapAt = now;
+      singleTapTimer = setTimeout(() => {
+        if (shotPaused) shotResume();
+        else shotReset();
+        lastTapAt = 0;
+        singleTapTimer = null;
+      }, 300);
     });
 
-    // Cleanup legacy key once (we do not store blindTimer explicitly)
-    try { localStorage.removeItem('blindTimer'); } catch(_){ }
-
+    // ===== Initialize =====
     renderBlinds();
     renderDisplay();
-    shotStart();
+    updateControlUI();
 
-    window.toggleFullscreen = function(){
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
-      else document.exitFullscreen().catch(()=>{});
+    window.toggleFullscreen = function () {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
     };
-    document.addEventListener('fullscreenchange', ()=>{
+    document.addEventListener('fullscreenchange', () => {
       const btn = document.getElementById('fsBtn');
-      if(btn) btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
+      if (btn) btn.textContent = document.fullscreenElement ? '🡽 Exit Full Screen' : '⛶ Full Screen';
     });
   </script>
 </body>
